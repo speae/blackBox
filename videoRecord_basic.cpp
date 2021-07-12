@@ -10,6 +10,10 @@
 #include <opencv2/highgui.hpp>
 #include <iostream>
 #include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <string.h>
 
 using namespace cv;
 using namespace std;
@@ -17,14 +21,37 @@ using namespace std;
 // "202107121433.avi"
 // #define OUTPUT_VIDEO_NAME "test.avi"
 #define VIDEO_WINDOW_NAME "record"
-    
-char fileName[30];
 
-void makefileName(void){
+char fileName[30];
+char folderName[30];
+char folderBuffer[30];
+char fileBuffer[30];
+struct folderNameStruct{
+  int folder_year;
+  int folder_month;
+  int folder_day;
+  int folder_hour;
+};
+char* makefolderName(void){
+  
   time_t UTCtime;
   struct tm* tm;
+  struct folderNameStruct* folderNameSave;    
   time(&UTCtime);
   tm = localtime(&UTCtime);
+  sprintf(folderBuffer, "%d%d%d%d\n", tm->tm_year, tm->tm_mon, tm->tm_mday, tm->tm_hour);
+  strftime(folderName, sizeof(folderName), "%Y%m%d%H", tm);
+  return folderName; 
+}
+
+void makefileName(void){
+  
+  time_t UTCtime;
+  struct tm* tm;    
+  struct folderNameStruct* folderNameSave;
+  time(&UTCtime);
+  tm = localtime(&UTCtime);
+  sprintf(fileBuffer, "%d%d%d%d\n", tm->tm_year, tm->tm_mon, tm->tm_mday, tm->tm_hour);
   strftime(fileName, sizeof(fileName), "%Y%m%d%H%M.avi", tm);
   printf("strftime : %s\n", fileName);  
 }
@@ -32,6 +59,12 @@ void makefileName(void){
 int main(int, char**)
 {
     // 1. VideoCapture("동영상 파일의 경로") 함수 사용
+    struct tm* tm;    
+    time_t UTCtime;      
+    time(&UTCtime);
+    tm = localtime(&UTCtime);
+
+    struct folderNameStruct* folderNameSave;    
     VideoCapture cap;
     VideoWriter writer;
     Mat frame;
@@ -39,9 +72,10 @@ int main(int, char**)
     // STEP 1. 카메라 장치 열기
     int deviceID = 0;
     int apiID = CAP_V4L2;
-    int maxFrame = 1780;
+    int maxFrame = 1440;
     int frameCount;
     int exitFlag = 0;
+    char *maked_folder_time = makefolderName();
 
     cap.open(deviceID, apiID);
 
@@ -50,9 +84,9 @@ int main(int, char**)
         return -1;
     }
 
-    cap.set(CAP_PROP_FPS, 30);
-    cap.set(CAP_PROP_FRAME_WIDTH, 640);
-    cap.set(CAP_PROP_FRAME_HEIGHT, 480);
+    cap.set(CAP_PROP_FPS, 24);
+    cap.set(CAP_PROP_FRAME_WIDTH, 320);
+    cap.set(CAP_PROP_FRAME_HEIGHT, 240);
     
     // Video Recording
     // 현재 카메라에서 초당 몇 프레임으로 출력하는지 확인
@@ -76,6 +110,7 @@ int main(int, char**)
       // 시간정보를 읽어와서 파일명 생성
       // 전역변수 fileName에 저장
       makefileName();
+      
       writer.open(fileName, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
 
       if (!writer.isOpened())
@@ -83,6 +118,35 @@ int main(int, char**)
         perror("Can't write video");
         return -1;
       }
+
+      cout << maked_folder_time << endl;
+
+      char currentBuffer[30];
+      int current_hour = tm->tm_hour;
+      sprintf(currentBuffer, "current_hour = %d\n", current_hour);
+
+      char basePath[] = {"/home/pi/blackBox/blackBox/"};
+      char* filePath;
+      filePath = strcat(basePath, maked_folder_time);
+      cout << filePath << endl;
+      if(access(filePath, 0777) == -1)
+      {
+        mkdir(maked_folder_time, 0777);
+      }
+      else if(currentBuffer != folderBuffer)
+      {
+        mkdir(maked_folder_time, 0777);
+      }
+      else if (currentBuffer == folderBuffer)
+      {
+        FILE* read_path;
+        char mv[5] = {"mv "};
+        char* srcPath = maked_folder_time;
+        char* dstPath;
+        dstPath = strcat(basePath, maked_folder_time);
+        fopen_s(&read_path, dstPath, "wb");
+      }
+
       frameCount = 0;
       
       // 창 생성
@@ -106,7 +170,7 @@ int main(int, char**)
         // ESC => 27; 'ESC' 키가 입력되면 종료
         // 키 입력을 확인
         // 카메라 영상에서 esc 키를 누를것
-        if (waitKey(1000/videoFPS) == 27)
+        if (waitKey(10) == 27)
         {
           printf("Stop video record\n");
           exitFlag = 1;
