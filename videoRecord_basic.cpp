@@ -15,8 +15,9 @@ using namespace cv;
 using namespace std;
 
 // "202107121433.avi"
-#define OUTPUT_VIDEO_NAME "test.avi"
-
+// #define OUTPUT_VIDEO_NAME "test.avi"
+#define VIDEO_WINDOW_NAME "record"
+    
 char fileName[30];
 
 void makefileName(void){
@@ -76,7 +77,6 @@ int main(int, char**)
     }
     
     // 창 생성
-    #define VIDEO_WINDOW_NAME "record"
     namedWindow(VIDEO_WINDOW_NAME);
 
     while (1)
