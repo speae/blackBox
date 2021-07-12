@@ -38,7 +38,11 @@ int main(int, char**)
 
     // STEP 1. 카메라 장치 열기
     int deviceID = 0;
-    int apiID = cv::CAP_V4L2;
+    int apiID = CAP_V4L2;
+    int maxFrame = 1780;
+    int frameCount;
+    int exitFlag = 0;
+
     cap.open(deviceID, apiID);
 
     if (!cap.isOpened()) {
@@ -50,9 +54,9 @@ int main(int, char**)
     cap.set(CAP_PROP_FRAME_WIDTH, 640);
     cap.set(CAP_PROP_FRAME_HEIGHT, 480);
     
-
     // Video Recording
     // 현재 카메라에서 초당 몇 프레임으로 출력하는지 확인
+    // CAP_PROP_FPS 값을 5라고 정의 
     float videoFPS = cap.get(CAP_PROP_FPS);
 
     // 해상도
@@ -67,44 +71,56 @@ int main(int, char**)
     // 3rd : FPS
     // 4th : ImageSize
     // 5th : isColor = True
-    makefileName();
-    writer.open(fileName, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
-
-    if (!writer.isOpened())
-    {
-      perror("Can't write video");
-      return -1;
-    }
-    
-    // 창 생성
-    namedWindow(VIDEO_WINDOW_NAME);
-
     while (1)
     {
-      // 카메라에서 매 프레임마다 이미지 읽기
-      cap.read(frame);     
+      // 시간정보를 읽어와서 파일명 생성
+      // 전역변수 fileName에 저장
+      makefileName();
+      writer.open(fileName, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
 
-      if (frame.empty()) {
-            perror("ERROR! blank frame grabbed\n");
-            break;
-      }  
-
-      // 읽어온 한 장의 프레임을 writer에 쓰기
-      writer << frame; // test.avi
-      imshow(VIDEO_WINDOW_NAME, frame);
-
-      // ESC => 27; 'ESC' 키가 입력되면 종료
-      // 키 입력을 확인
-      if (waitKey(1000/videoFPS) == 27)
+      if (!writer.isOpened())
       {
-        printf("Stop video record\n");
+        perror("Can't write video");
+        return -1;
+      }
+      frameCount = 0;
+      
+      // 창 생성
+      namedWindow(VIDEO_WINDOW_NAME);
+
+      while (frameCount < maxFrame)
+      {
+        // 카메라에서 매 프레임마다 이미지 읽기
+        cap.read(frame);     
+        frameCount++;
+
+        if (frame.empty()) {
+              perror("ERROR! blank frame grabbed\n");
+              break;
+        }  
+
+        // 읽어온 한 장의 프레임을 writer에 쓰기
+        writer << frame; // test.avi
+        imshow(VIDEO_WINDOW_NAME, frame);
+
+        // ESC => 27; 'ESC' 키가 입력되면 종료
+        // 키 입력을 확인
+        // 카메라 영상에서 esc 키를 누를것
+        if (waitKey(1000/videoFPS) == 27)
+        {
+          printf("Stop video record\n");
+          exitFlag = 1;
+          break;
+        }   
+      }
+      writer.release();
+      if (exitFlag == 1){
         break;
       }
-      
     }
-    cap.release();
-    writer.release();
 
+    cap.release();
+    
     // 창 삭제
     destroyWindow(VIDEO_WINDOW_NAME);
 
