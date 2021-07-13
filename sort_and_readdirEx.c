@@ -3,7 +3,9 @@
 #include <stdio.h> 
 #include <stdlib.h> 
 #include <errno.h>
+
 #define MAX_LIST 50 
+
 const char *path = "/home/pi/blackBox/blackBox/daytime"; 
 
 static int filter(const struct dirent* dirent){

@@ -1,19 +1,17 @@
-/**
-  @file videocapture_basic.cpp
-  @brief A very basic sample for using VideoCapture and VideoWriter
-  @author PkLab.net
-  @date Aug 24, 2016
-*/
-
 #include <opencv2/core.hpp>
 #include <opencv2/videoio.hpp>
 #include <opencv2/highgui.hpp>
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
+#include <libgen.h>
+#include <sys/vfs.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <string.h>
+#include <fcntl.h> // O_WRONLY
+#include <unistd.h> // write(), read()
 
 using namespace cv;
 using namespace std;
@@ -22,54 +20,142 @@ using namespace std;
 // #define OUTPUT_VIDEO_NAME "test.avi"
 #define VIDEO_WINDOW_NAME "record"
 
-char fileName[30];
-char folderName[30];
-char* folderBuffer;
-char fileBuffer[30];
-struct folderNameStruct{
-  int folder_year;
-  int folder_month;
-  int folder_day;
-  int folder_hour;
-};
+#define TIME_FILENAME 0
+#define FOLDER_NAME 1
+#define LOG_TIME 2
 
-char* makefolderName(void){
+char folderName[30];
+char tBUF[100];
+const char *MMOUNT = "/proc/mounts";
+
+void makefolderName(void){
   
   time_t UTCtime;
   struct tm* tm;
-  struct folderNameStruct* folderNameSave;    
   time(&UTCtime);
   tm = localtime(&UTCtime);
-  folderBuffer = (char*)malloc(sizeof(char32_t));
-  sprintf(folderBuffer, "%d%d%d%d\n", tm->tm_year, tm->tm_mon, tm->tm_mday, tm->tm_hour);
   strftime(folderName, sizeof(folderName), "%Y%m%d%H", tm);
-  return folderName; 
 }
 
-void makefileName(void){
+void getTime(int ret_type){
   
   time_t UTCtime;
   struct tm* tm;    
-  struct folderNameStruct* folderNameSave;
   time(&UTCtime);
   tm = localtime(&UTCtime);
-  sprintf(fileBuffer, "%d%d%d%d\n", tm->tm_year, tm->tm_mon, tm->tm_mday, tm->tm_hour);
-  strftime(fileName, sizeof(fileName), "%Y%m%d%H%M.avi", tm);
-  printf("strftime : %s\n", fileName);  
+  if (ret_type == TIME_FILENAME)
+  {
+    strftime(tBUF, sizeof(tBUF), "%Y%m%d%H%M%S.avi", tm);
+  }
+  else if (ret_type == FOLDER_NAME)
+  {
+    strftime(tBUF, sizeof(tBUF), "%Y%m%d%H", tm);
+    
+  }
+  else if (ret_type == LOG_TIME)
+  {
+    strftime(tBUF, sizeof(tBUF), "[%Y-%m-%d %H:%M:%S]", tm);
+    
+  }
+}
+
+struct f_size
+{
+    long blocks;
+    long avail; 
+    float ratio;
+};
+
+typedef struct _mountinfo 
+{
+    FILE *fp;                // 파일 스트림 포인터    
+    char devname[80];        // 장치 이름
+    char mountdir[80];        // 마운트 디렉토리 이름
+    char fstype[12];        // 파일 시스템 타입
+    struct f_size size;        // 파일 시스템의 총크기/사용율 
+} MOUNTP;
+
+MOUNTP *dfopen()
+{
+    MOUNTP *MP;
+
+    // /proc/mounts 파일을 연다.
+    MP = (MOUNTP *)malloc(sizeof(MOUNTP));
+    if(!(MP->fp = fopen(MMOUNT, "r")))
+    {
+        return NULL;
+    }
+    else
+        return MP;
+}
+
+MOUNTP *dfget(MOUNTP *MP)
+{
+    char buf[256];
+    char *bname;
+    char null[16];
+    struct statfs lstatfs;
+    struct stat lstat; 
+    int is_root = 0;
+
+    // /proc/mounts로 부터 마운트된 파티션의 정보를 얻어온다.
+    while(fgets(buf, 255, MP->fp))
+    {
+        is_root = 0;
+        sscanf(buf, "%s%s%s",MP->devname, MP->mountdir, MP->fstype);
+        
+        // /dev/root
+        if (strcmp(MP->mountdir,"/") == 0) is_root=1;
+        // if (stat(MP->devname, &lstat) == 0 || is_root)
+        if(is_root)
+        {
+            if (strstr(buf, MP->mountdir) && S_ISBLK(lstat.st_mode) || is_root)
+            {
+                // 파일시스템의 총 할당된 크기와 사용량을 구한다.        
+                statfs(MP->mountdir, &lstatfs);
+                MP->size.blocks = lstatfs.f_blocks * (lstatfs.f_bsize/1024); 
+                MP->size.avail  = lstatfs.f_bavail * (lstatfs.f_bsize/1024); 
+                MP->size.ratio = (MP->size.avail * 100) / MP->size.blocks;
+                return MP;
+            }
+            break;
+        }
+    }
+    rewind(MP->fp);
+    return NULL;
+}
+
+int dfclose(MOUNTP *MP)
+{
+    fclose(MP->fp);
+    return 0;
 }
 
 int main(int, char**)
 {
     // 1. VideoCapture("동영상 파일의 경로") 함수 사용
+    FILE* fp;
+    
     struct tm* tm;    
     time_t UTCtime;      
     time(&UTCtime);
-    tm = localtime(&UTCtime);
+    tm = localtime(&UTCtime);  
 
-    struct folderNameStruct* folderNameSave;    
     VideoCapture cap;
     VideoWriter writer;
     Mat frame;
+    int fd;
+    char buff[200];
+    char filePath[100];
+      
+    int length;
+    int WRBytes;
+
+    // 로그파일을 기록하기 위해 파일열기
+    fd = open("/home/pi/blackBox/blackBox/blackBox.log", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    getTime(LOG_TIME);
+    length = sprintf(buff, "%sblackbox log파일 저장을 시작합니다.\n", tBUF);
+    WRBytes = write(fd, buff, length);
 
     // STEP 1. 카메라 장치 열기
     int deviceID = 0;
@@ -77,8 +163,7 @@ int main(int, char**)
     int maxFrame = 1440;
     int frameCount;
     int exitFlag = 0;
-    char* maked_folder_time = makefolderName();
-
+    
     cap.open(deviceID, apiID);
 
     if (!cap.isOpened()) {
@@ -107,14 +192,41 @@ int main(int, char**)
     // 3rd : FPS
     // 4th : ImageSize
     // 5th : isColor = True
+
+    float limit_size = 0.0f;
+
     while (1)
     {
+      MOUNTP *MP;
+      if ((MP=dfopen()) == NULL)
+      {
+          perror("error");
+          exit(1);
+      }
+ 
+      while(dfget(MP))
+      {
+        printf("%5f\n", MP->size.ratio);
+      }
+      if ((limit_size = MP->size.ratio) <= 53)
+      {
+        printf("용량이 부족합니다.\n");
+        exit(1);
+      }
+      
+
+      printf("==================\n\n");
+      
       // 시간정보를 읽어와서 파일명 생성
       // 전역변수 fileName에 저장
-      makefileName();
+      getTime(TIME_FILENAME);
+      printf("filePath : %s\n", tBUF);
+      sprintf(filePath, "/home/pi/blackBox/blackBox/%s", tBUF);
+      writer.open(filePath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
+      getTime(LOG_TIME);
+      length = sprintf(buff, "%s %s 명으로 녹화를 시작합니다.\n", tBUF, filePath);
+      WRBytes = write(fd, buff, length);
       
-      writer.open(fileName, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
-
       if (!writer.isOpened())
       {
         perror("Can't write video");
@@ -152,53 +264,46 @@ int main(int, char**)
         }   
       }
 
-      cout << maked_folder_time << endl;
-
-      char* currentBuffer;
-      currentBuffer = (char*)malloc(sizeof(char32_t));
-      int current_hour = tm->tm_hour;
-      sprintf(currentBuffer, "current_hour = %d\n", current_hour);
+      char currentBuffer[50];
+      char* current_time;
+      strftime(currentBuffer, sizeof(currentBuffer), "%Y%m%d%H", tm);
+      current_time = currentBuffer;
+      cout << current_time << endl;
 
       char basePath[] = {"/home/pi/blackBox/blackBox/"};
-      char* filePath;
-      filePath = strcat(basePath, maked_folder_time);
       cout << filePath << endl;
-      cout << folderBuffer << endl;
+      cout << folderName << endl;
       cout << currentBuffer << endl;
 
-      if(access(filePath, F_OK) == -1)
+      if(access(folderName, F_OK) == -1)
       {
-        mkdir(maked_folder_time, 0755);
+        mkdir(folderName, 0755);
+        if (currentBuffer == folderName)
+        {
+          char command[255];
+          sprintf(command, "mv %s %s", filePath, folderName);
+          popen(command, "r");
+          cout << command << endl;
+          pclose(fp);
+        }
+        else
+        {    
+          char command[255];
+          sprintf(command, "mv %s %s", filePath, currentBuffer);
+          fp = popen(command, "r");
+          cout << command << endl;
+          pclose(fp);
+        }
       }
       else
       {
-        if (currentBuffer == folderBuffer)
-        {
-          char* command;
-          char mv[5] = {"mv "};
-          char* srcFile = fileName;
-          char* dstPath = folderBuffer;
-          char* resultPath;
-          resultPath = strcat(srcFile, dstPath);
-          command = strcat(mv, resultPath);
-          popen(command, "rb");
-          free(currentBuffer);
-        }
-        else
-        {
-          mkdir(maked_folder_time, 0777);
-
-          char* command;
-          char mv[5] = {"mv "};
-          char* srcFile = fileName;
-          char* dstPath = currentBuffer;
-          char* resultPath;
-          resultPath = strcat(srcFile, dstPath);
-          command = strcat(mv, resultPath);
-          popen(command, "rb");
-        }
+        char command[255];
+        sprintf(command, "mv %s %s", filePath, folderName);
+        popen(command, "r");
+        cout << command << endl;
+        pclose(fp);
       }
-
+      
       writer.release();
       if (exitFlag == 1){
         break;

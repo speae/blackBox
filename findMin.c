@@ -16,7 +16,7 @@ int searchOldFolder(void)
 
     min = num[0];     // min 초기화
 
-    printf("sizeof(long unsigned int)=%d\n", sizeof(int));
+    printf("sizeof(int)=%d\n", sizeof(int));
 
     printf("==================================================\n");
 
