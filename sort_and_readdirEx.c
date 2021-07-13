@@ -20,14 +20,14 @@ static int filter(const struct dirent* dirent){
     return result;
 }
 
-long searchOldFolder(void) 
+int searchOldFolder(void) 
 { 
     struct dirent **namelist; 
     int count; 
     int idx; 
-    long min;
-    long num[MAX_LIST];
-
+    int min = 0;
+    int num[MAX_LIST];
+    
     // 1st : 내가 탐색하고자 하는 폴더
     // 2nd : namelist를 받아올 구조체 주소값
     // 3rd : filter
@@ -38,22 +38,26 @@ long searchOldFolder(void)
         fprintf(stderr, "%s Directory Scan Error: %s\n", path, strerror(errno)); 
         return 1; 
     } 
-    printf("count=%d\n",count);    
+    printf("count = %d\n",count);    
     
     for(idx=0;idx<count;idx++)
     {
-        num[idx] = atol(namelist[idx]->d_name);
-        printf("num[idx] = %ld\n", num[idx]);
+        num[idx] = atoi(namelist[idx]->d_name);
     }
 
-    min = num[0];     //min 초기화
-
-    for(idx = 0;idx<count;idx++)
+    min = num[0];
+    
+    for(idx = 0; idx < count; idx++)
     {
-        if(num[idx] < min ) //num[idx]가 min보다 작다면
-            min = num[idx]; //min 에는 num[idx]의 값이 들어감    
+        if(num[idx] < min) //num[idx]가 min보다 작다면
+            min = num[idx]; //min 에는 num[idx]의 값이 들어감
+        else
+        {
+            continue;
+        }
+                
     }
-    printf("min = %ld\n", min);
+    printf("min = %d\n", min);
 
     // 건별 데이터 메모리 해제 
     for(idx = 0; idx < count; idx++) 
@@ -69,10 +73,10 @@ long searchOldFolder(void)
 
 int main(void) { 
     
-    long result; 
+    int result; 
     char folderName[30];
     result = searchOldFolder();
-    sprintf(folderName,"%ld",result);
+    sprintf(folderName,"%d",result);
     printf("가장 오래된 폴더는 %s 이다.\n",folderName);
 
 }

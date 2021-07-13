@@ -2,6 +2,7 @@
 #include <opencv2/videoio.hpp>
 #include <opencv2/highgui.hpp>
 #include <iostream>
+#include <dirent.h> 
 #include <stdio.h>
 #include <stdlib.h>
 #include <libgen.h>
@@ -25,8 +26,10 @@ using namespace std;
 #define LOG_TIME 2
 
 char tBUF[100];
-int num[1000];
-int i = 0;
+char filePath[100];
+char folderPath[100];
+char resultPath[100];
+
 const char *MMOUNT = "/proc/mounts";
 
 void getTime(int ret_type){
@@ -42,14 +45,10 @@ void getTime(int ret_type){
   else if (ret_type == FOLDER_NAME)
   {
     strftime(tBUF, sizeof(tBUF), "%Y%m%d%H", tm);
-    num[i] = atoi(tBUF);
-    printf("숫자로 입력됨; num[%d] : %d\n", i, num[i]);
-    i++;
   }
   else if (ret_type == LOG_TIME)
   {
     strftime(tBUF, sizeof(tBUF), "[%Y-%m-%d %H:%M:%S]", tm);
-    
   }
 }
 
@@ -125,27 +124,119 @@ int dfclose(MOUNTP *MP)
     return 0;
 }
 
+static int filter(const struct dirent* dirent){
+    
+    int result;
+
+    /* 현재 디렉토리, 이전 디렉토리 표시는 출력안함 */
+    // strcmp()함수는 true면 0 반환 == !(not)
+    // ==> .이나 ..이면 filter()함수에서 0을 반환하여 scandir에서 제외시킴 
+    result = !(strcmp(dirent->d_name, ".")) || !(strcmp(dirent->d_name, "..")) ? 0 : 1;
+
+    return result;
+}
+
+int searchOldFolder(char* folderPath) 
+{ 
+    struct dirent **namelist; 
+    int count; 
+    int idx; 
+    int min = 0;
+    int num[100];
+    int missionSuccess;
+    
+    // 1st : 내가 탐색하고자 하는 폴더
+    // 2nd : namelist를 받아올 구조체 주소값
+    // 3rd : filter
+    // 4th : 알파벳 정렬
+    // scandir()함수에서 namelist 메모리를 malloc
+    if((count = scandir(folderPath, &namelist, *filter, alphasort)) == -1) 
+    { 
+        fprintf(stderr, "%s Directory Scan Error: %s\n", folderPath, strerror(errno)); 
+        return 1; 
+    } 
+    printf("count = %d\n",count);    
+    
+    for(idx=0; idx<count; idx++)
+    {
+        num[idx] = atoi(namelist[idx]->d_name);
+        printf("num[idx] = %d\n", num[idx]);
+    }
+
+    min = num[0];
+    
+    for(idx = 0; idx < count; idx++)
+    {
+        printf("num[idx] = %d\n", num[idx]);
+        printf("count = %d\n", count);
+        if(num[idx] < min) //num[idx]가 min보다 작다면
+            min = num[idx]; //min 에는 num[idx]의 값이 들어감
+        else
+        {
+            continue;
+        }
+                
+    }
+    printf("min = %d\n", min);
+
+    idx = 0;
+    while(count != 0)
+    {
+      sprintf(filePath, "/home/pi/blackBox/blackBox/%d", num[idx]);
+      if (unlink(filePath) == -1)
+        {
+          printf("파일 삭제 실패\n");
+          missionSuccess = 0;
+        }
+        else
+        {
+          printf("파일 삭제 성공\n");
+          idx++;
+        }
+      
+    }
+    
+    if (count == 0)
+    {
+      if (rmdir(folderPath) == -1)
+      {
+        printf("폴더 삭제 실패\n");
+        missionSuccess = 0; 
+      }
+      else
+      {
+        printf("폴더 삭제 성공\n");
+        missionSuccess = 1;
+      }
+      
+    }
+    
+    // 건별 데이터 메모리 해제 
+    for(idx = 0; idx < count; idx++) 
+    { 
+      free(namelist[idx]); 
+    } 
+    
+    // namelist에 대한 메모리 해제 
+    free(namelist); 
+    
+    return missionSuccess; 
+}
+
 int main(int, char**)
 {
     // 1. VideoCapture("동영상 파일의 경로") 함수 사용
-    FILE* fp;
-    
-    struct tm* tm;    
-    time_t UTCtime;      
-    time(&UTCtime);
-    tm = localtime(&UTCtime);  
-
     VideoCapture cap;
     VideoWriter writer;
     Mat frame;
     int fd;
     char buff[200];
-    char filePath[100];
-    char folderPath[100];
       
     int length;
     int WRBytes;
 
+    FILE* fp;   
+    
     // 로그파일을 기록하기 위해 파일열기
     fd = open("/home/pi/blackBox/blackBox/blackBox.log", O_WRONLY | O_CREAT | O_TRUNC, 0644);
     getTime(LOG_TIME);
@@ -192,6 +283,16 @@ int main(int, char**)
 
     while (1)
     {
+      // 시간정보를 읽어와서 파일명 생성
+      // 전역변수 fileName에 저장
+      getTime(TIME_FILENAME);
+      printf("filePath : %s\n", tBUF);
+      sprintf(filePath, "/home/pi/blackBox/blackBox/%s", tBUF);
+      getTime(FOLDER_NAME);
+      printf("folderPath : %s\n", tBUF);
+      sprintf(folderPath, "%s", tBUF);
+      sprintf(resultPath, "%s/%s", filePath, folderPath);
+      
       MOUNTP *MP;
       if ((MP=dfopen()) == NULL)
       {
@@ -199,25 +300,42 @@ int main(int, char**)
           exit(1);
       }
  
-      while(dfget(MP))
+      if (dfget(MP))
       {
-        printf("%5f\n", MP->size.ratio);
+        if ((limit_size = MP->size.ratio) <= 53)
+        { 
+          printf("용량이 부족합니다.\n");
+          printf("%5f\n", limit_size);
+          printf("==================\n\n");
+          while (limit_size <= 53)
+          {
+            int rewinder;
+            rewinder = searchOldFolder(folderPath);
+            if (rewinder == 0)
+            {
+              printf("용량 확보 실패.\n");
+            }
+            
+          }
+        }
+        else
+        {
+          printf("용량을 확보했습니다.\n");
+          printf("%5f\n", limit_size);
+          printf("==================\n\n");
+        } 
       }
-      if ((limit_size = MP->size.ratio) <= 53)
-      {
-        printf("용량이 부족합니다.\n");
-        exit(1);
-      }
-      
 
-      printf("==================\n\n");
+      if(access(folderPath, F_OK) == -1)
+      {
+        mkdir(folderPath, 0755);
+        writer.open(resultPath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
+      }
+      else
+      {
+        writer.open(resultPath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
+      }
       
-      // 시간정보를 읽어와서 파일명 생성
-      // 전역변수 fileName에 저장
-      getTime(TIME_FILENAME);
-      printf("filePath : %s\n", tBUF);
-      sprintf(filePath, "/home/pi/blackBox/blackBox/%s", tBUF);
-      writer.open(filePath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
       getTime(LOG_TIME);
       length = sprintf(buff, "%s %s 명으로 녹화를 시작합니다.\n", tBUF, filePath);
       WRBytes = write(fd, buff, length);
@@ -240,8 +358,8 @@ int main(int, char**)
         frameCount++;
 
         if (frame.empty()) {
-              perror("ERROR! blank frame grabbed\n");
-              break;
+          perror("ERROR! blank frame grabbed\n");
+          break;
         }  
 
         // 읽어온 한 장의 프레임을 writer에 쓰기
@@ -259,53 +377,21 @@ int main(int, char**)
         }   
       }
 
-      char currentBuffer[50];
-      char* current_time;
+      char currentBuffer[100];
+      char current_time[100];
+      struct tm* tm;  
+      time_t UTCtime;  
+      time(&UTCtime);
+      tm = localtime(&UTCtime);
       strftime(currentBuffer, sizeof(currentBuffer), "%Y%m%d%H", tm);
-      current_time = currentBuffer;
+      sprintf(current_time, "%s", currentBuffer);
 
+      cout << current_time << endl;
       cout << filePath << endl;
 
-      char folder_path[100];
-      getTime(FOLDER_NAME);
-      sprintf(folder_path, "%s", tBUF);
-      printf("folder_path : %s", folder_path);
-      
       getTime(LOG_TIME);
-      length = sprintf(buff, "%s %s 명으로 폴더가 생성되거나 파일이 이동합니다.\n", tBUF, folder_path);
+      length = sprintf(buff, "%s %s 명으로 폴더가 생성되거나 파일이 이동합니다.\n", tBUF, folderPath);
       WRBytes = write(fd, buff, length);
-      
-      if(access(folder_path, F_OK) == -1)
-      {
-        mkdir(folder_path, 0755);
-        if (current_time == folder_path)
-        {
-          char command[255];
-          sprintf(command, "mv %s %s", filePath, folder_path);
-          fp = popen(command, "r");
-          pclose(fp);
-          cout << command << endl;
-          
-        }
-        else
-        {    
-          char command[255];
-          sprintf(command, "mv %s %s", filePath, current_time);
-          fp = popen(command, "r");
-          pclose(fp);
-          cout << command << endl;
-          
-        }
-      }
-      else
-      {
-        char command[255];
-        sprintf(command, "mv %s %s", filePath, folder_path);
-        fp = popen(command, "r");
-        pclose(fp);
-        cout << command << endl;
-        
-      }
       
       writer.release();
       if (exitFlag == 1){
