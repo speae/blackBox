@@ -31,8 +31,8 @@ char folderPath[100];
 char resultPath[100];
 int savePath[100] = {2021071317, 2021071319};
 int i = 0;
-const char *MMOUNT = "/proc/mounts";
-
+const char* MMOUNT = "/proc/mounts";
+const char* BASEPATH = "/home/pi/blackBox/blackBox/daytime";
 void getTime(int ret_type){
   
   time_t UTCtime;
@@ -150,15 +150,10 @@ int searchOldFolder(int savePath)
     // 3rd : filter
     // 4th : 알파벳 정렬
     // scandir()함수에서 namelist 메모리를 malloc
-    printf("삭제할 폴더 경로 : %d\n", savePath);
-    sprintf(folderPath, "/home/pi/blackBox/blackBox/%d\n", savePath);
-    const char* deletePath = "";
-    deletePath = folderPath;
-    printf("삭제할 폴더 경로2 : %s\n", deletePath);
     
-    if((count = scandir("/home/pi/blackBox/blackBox/2021071317", &namelist, *filter, alphasort)) == -1) 
+    if((count = scandir(BASEPATH, &namelist, *filter, alphasort)) == -1) 
     { 
-        fprintf(stderr, "%s Directory Scan Error: %s\n", deletePath, strerror(errno)); 
+        fprintf(stderr, "%s Directory Scan Error: %s\n", BASEPATH, strerror(errno)); 
         return 1; 
     } 
     printf("count = %d\n",count);    
@@ -188,17 +183,17 @@ int searchOldFolder(int savePath)
     idx = 0;
     while(count != 0)
     {
-      sprintf(filePath, "/home/pi/blackBox/blackBox/%lld", num[idx]);
+      sprintf(filePath, "%s/%lld", BASEPATH, num[idx]);
       if (unlink(filePath) == -1)
-        {
-          printf("파일 삭제 실패\n");
-          missionSuccess = 0;
-        }
-        else
-        {
-          printf("파일 삭제 성공\n");
-          idx++;
-        }
+      {
+        printf("파일 삭제 실패\n");
+        missionSuccess = 0;
+      }
+      else
+      {
+        printf("파일 삭제 성공\n");
+        idx++;
+      }
       
     }
     
@@ -326,28 +321,30 @@ int main(int, char**)
       // 전역변수 fileName에 저장
       getTime(TIME_FILENAME);
       printf("filePath : %s\n", tBUF);
-      sprintf(filePath, "/home/pi/blackBox/blackBox/%s", tBUF);
+      sprintf(filePath, "%s/%s", BASEPATH, tBUF);
+
+      getTime(LOG_TIME);
+      length = sprintf(buff, "%s %s 명으로 녹화를 시작합니다.\n", tBUF, filePath);
+      
       getTime(FOLDER_NAME);
       printf("folderPath : %s\n", tBUF);
-      sprintf(folderPath, "%s", tBUF);
-      sprintf(resultPath, "%s/%s", filePath, folderPath);
+      sprintf(folderPath, "%s/%s", BASEPATH, tBUF);
+      
+      getTime(LOG_TIME);
+      length = sprintf(buff, "%s %s 명으로 폴더가 생성되거나 파일이 이동합니다.\n", tBUF, folderPath);
+      WRBytes = write(fd, buff, length);
+      
+      WRBytes = write(fd, buff, length);
 
       if(access(folderPath, F_OK) == -1)
       {
-        mkdir(folderPath, 0755); 
-        sprintf(buff, "%d\n", savePath);
-        int j = strlen(buff);
-        savePath[j] = atoi(tBUF);
-        writer.open(resultPath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
+        mkdir(folderPath, 0755);    
+        writer.open(filePath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
       }
       else
       {
-        writer.open(resultPath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
+        writer.open(filePath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
       }
-      
-      getTime(LOG_TIME);
-      length = sprintf(buff, "%s %s 명으로 녹화를 시작합니다.\n", tBUF, filePath);
-      WRBytes = write(fd, buff, length);
       
       if (!writer.isOpened())
       {
@@ -386,21 +383,7 @@ int main(int, char**)
         }   
       }
 
-      char currentBuffer[100];
-      char current_time[100];
-      struct tm* tm;  
-      time_t UTCtime;  
-      time(&UTCtime);
-      tm = localtime(&UTCtime);
-      strftime(currentBuffer, sizeof(currentBuffer), "%Y%m%d%H", tm);
-      sprintf(current_time, "%s", currentBuffer);
-
-      cout << current_time << endl;
-      cout << filePath << endl;
-
-      getTime(LOG_TIME);
-      length = sprintf(buff, "%s %s 명으로 폴더가 생성되거나 파일이 이동합니다.\n", tBUF, folderPath);
-      WRBytes = write(fd, buff, length);
+      
       
       writer.release();
       if (exitFlag == 1){
