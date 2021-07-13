@@ -24,18 +24,10 @@ using namespace std;
 #define FOLDER_NAME 1
 #define LOG_TIME 2
 
-char folderName[30];
 char tBUF[100];
+int num[1000];
+int i = 0;
 const char *MMOUNT = "/proc/mounts";
-
-void makefolderName(void){
-  
-  time_t UTCtime;
-  struct tm* tm;
-  time(&UTCtime);
-  tm = localtime(&UTCtime);
-  strftime(folderName, sizeof(folderName), "%Y%m%d%H", tm);
-}
 
 void getTime(int ret_type){
   
@@ -50,7 +42,9 @@ void getTime(int ret_type){
   else if (ret_type == FOLDER_NAME)
   {
     strftime(tBUF, sizeof(tBUF), "%Y%m%d%H", tm);
-    
+    num[i] = atoi(tBUF);
+    printf("숫자로 입력됨; num[%d] : %d\n", i, num[i]);
+    i++;
   }
   else if (ret_type == LOG_TIME)
   {
@@ -147,6 +141,7 @@ int main(int, char**)
     int fd;
     char buff[200];
     char filePath[100];
+    char folderPath[100];
       
     int length;
     int WRBytes;
@@ -268,40 +263,48 @@ int main(int, char**)
       char* current_time;
       strftime(currentBuffer, sizeof(currentBuffer), "%Y%m%d%H", tm);
       current_time = currentBuffer;
-      cout << current_time << endl;
 
-      char basePath[] = {"/home/pi/blackBox/blackBox/"};
       cout << filePath << endl;
-      cout << folderName << endl;
-      cout << currentBuffer << endl;
 
-      if(access(folderName, F_OK) == -1)
+      char folder_path[100];
+      getTime(FOLDER_NAME);
+      sprintf(folder_path, "%s", tBUF);
+      printf("folder_path : %s", folder_path);
+      
+      getTime(LOG_TIME);
+      length = sprintf(buff, "%s %s 명으로 폴더가 생성되거나 파일이 이동합니다.\n", tBUF, folder_path);
+      WRBytes = write(fd, buff, length);
+      
+      if(access(folder_path, F_OK) == -1)
       {
-        mkdir(folderName, 0755);
-        if (currentBuffer == folderName)
+        mkdir(folder_path, 0755);
+        if (current_time == folder_path)
         {
           char command[255];
-          sprintf(command, "mv %s %s", filePath, folderName);
-          popen(command, "r");
-          cout << command << endl;
+          sprintf(command, "mv %s %s", filePath, folder_path);
+          fp = popen(command, "r");
           pclose(fp);
+          cout << command << endl;
+          
         }
         else
         {    
           char command[255];
-          sprintf(command, "mv %s %s", filePath, currentBuffer);
+          sprintf(command, "mv %s %s", filePath, current_time);
           fp = popen(command, "r");
-          cout << command << endl;
           pclose(fp);
+          cout << command << endl;
+          
         }
       }
       else
       {
         char command[255];
-        sprintf(command, "mv %s %s", filePath, folderName);
-        popen(command, "r");
-        cout << command << endl;
+        sprintf(command, "mv %s %s", filePath, folder_path);
+        fp = popen(command, "r");
         pclose(fp);
+        cout << command << endl;
+        
       }
       
       writer.release();
@@ -311,9 +314,9 @@ int main(int, char**)
     }
 
     cap.release();
-    
+
     // 창 삭제
     destroyWindow(VIDEO_WINDOW_NAME);
-
+     
     return 0;
 }
