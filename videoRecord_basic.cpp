@@ -24,7 +24,7 @@ using namespace std;
 
 char fileName[30];
 char folderName[30];
-char folderBuffer[30];
+char* folderBuffer;
 char fileBuffer[30];
 struct folderNameStruct{
   int folder_year;
@@ -32,6 +32,7 @@ struct folderNameStruct{
   int folder_day;
   int folder_hour;
 };
+
 char* makefolderName(void){
   
   time_t UTCtime;
@@ -39,6 +40,7 @@ char* makefolderName(void){
   struct folderNameStruct* folderNameSave;    
   time(&UTCtime);
   tm = localtime(&UTCtime);
+  folderBuffer = (char*)malloc(sizeof(char32_t));
   sprintf(folderBuffer, "%d%d%d%d\n", tm->tm_year, tm->tm_mon, tm->tm_mday, tm->tm_hour);
   strftime(folderName, sizeof(folderName), "%Y%m%d%H", tm);
   return folderName; 
@@ -75,7 +77,7 @@ int main(int, char**)
     int maxFrame = 1440;
     int frameCount;
     int exitFlag = 0;
-    char *maked_folder_time = makefolderName();
+    char* maked_folder_time = makefolderName();
 
     cap.open(deviceID, apiID);
 
@@ -119,34 +121,6 @@ int main(int, char**)
         return -1;
       }
 
-      cout << maked_folder_time << endl;
-
-      char currentBuffer[30];
-      int current_hour = tm->tm_hour;
-      sprintf(currentBuffer, "current_hour = %d\n", current_hour);
-
-      char basePath[] = {"/home/pi/blackBox/blackBox/"};
-      char* filePath;
-      filePath = strcat(basePath, maked_folder_time);
-      cout << filePath << endl;
-      if(access(filePath, 0777) == -1)
-      {
-        mkdir(maked_folder_time, 0777);
-      }
-      else if(currentBuffer != folderBuffer)
-      {
-        mkdir(maked_folder_time, 0777);
-      }
-      else if (currentBuffer == folderBuffer)
-      {
-        FILE* read_path;
-        char mv[5] = {"mv "};
-        char* srcPath = maked_folder_time;
-        char* dstPath;
-        dstPath = strcat(basePath, maked_folder_time);
-        fopen_s(&read_path, dstPath, "wb");
-      }
-
       frameCount = 0;
       
       // 창 생성
@@ -177,6 +151,54 @@ int main(int, char**)
           break;
         }   
       }
+
+      cout << maked_folder_time << endl;
+
+      char* currentBuffer;
+      currentBuffer = (char*)malloc(sizeof(char32_t));
+      int current_hour = tm->tm_hour;
+      sprintf(currentBuffer, "current_hour = %d\n", current_hour);
+
+      char basePath[] = {"/home/pi/blackBox/blackBox/"};
+      char* filePath;
+      filePath = strcat(basePath, maked_folder_time);
+      cout << filePath << endl;
+      cout << folderBuffer << endl;
+      cout << currentBuffer << endl;
+
+      if(access(filePath, F_OK) == -1)
+      {
+        mkdir(maked_folder_time, 0755);
+      }
+      else
+      {
+        if (currentBuffer == folderBuffer)
+        {
+          char* command;
+          char mv[5] = {"mv "};
+          char* srcFile = fileName;
+          char* dstPath = folderBuffer;
+          char* resultPath;
+          resultPath = strcat(srcFile, dstPath);
+          command = strcat(mv, resultPath);
+          popen(command, "rb");
+          free(currentBuffer);
+        }
+        else
+        {
+          mkdir(maked_folder_time, 0777);
+
+          char* command;
+          char mv[5] = {"mv "};
+          char* srcFile = fileName;
+          char* dstPath = currentBuffer;
+          char* resultPath;
+          resultPath = strcat(srcFile, dstPath);
+          command = strcat(mv, resultPath);
+          popen(command, "rb");
+        }
+      }
+
       writer.release();
       if (exitFlag == 1){
         break;
