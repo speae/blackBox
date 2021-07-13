@@ -29,7 +29,8 @@ char tBUF[100];
 char filePath[100];
 char folderPath[100];
 char resultPath[100];
-
+int savePath[100] = {2021071317, 2021071319};
+int i = 0;
 const char *MMOUNT = "/proc/mounts";
 
 void getTime(int ret_type){
@@ -132,17 +133,16 @@ static int filter(const struct dirent* dirent){
     // strcmp()함수는 true면 0 반환 == !(not)
     // ==> .이나 ..이면 filter()함수에서 0을 반환하여 scandir에서 제외시킴 
     result = !(strcmp(dirent->d_name, ".")) || !(strcmp(dirent->d_name, "..")) ? 0 : 1;
-
     return result;
 }
 
-int searchOldFolder(char* folderPath) 
+int searchOldFolder(int savePath) 
 { 
     struct dirent **namelist; 
     int count; 
     int idx; 
-    int min = 0;
-    int num[100];
+    long long min = 0;
+    long long num[100];
     int missionSuccess;
     
     // 1st : 내가 탐색하고자 하는 폴더
@@ -150,24 +150,30 @@ int searchOldFolder(char* folderPath)
     // 3rd : filter
     // 4th : 알파벳 정렬
     // scandir()함수에서 namelist 메모리를 malloc
-    if((count = scandir(folderPath, &namelist, *filter, alphasort)) == -1) 
+    printf("삭제할 폴더 경로 : %d\n", savePath);
+    sprintf(folderPath, "/home/pi/blackBox/blackBox/%d\n", savePath);
+    const char* deletePath = "";
+    deletePath = folderPath;
+    printf("삭제할 폴더 경로2 : %s\n", deletePath);
+    
+    if((count = scandir("/home/pi/blackBox/blackBox/2021071317", &namelist, *filter, alphasort)) == -1) 
     { 
-        fprintf(stderr, "%s Directory Scan Error: %s\n", folderPath, strerror(errno)); 
+        fprintf(stderr, "%s Directory Scan Error: %s\n", deletePath, strerror(errno)); 
         return 1; 
     } 
     printf("count = %d\n",count);    
     
     for(idx=0; idx<count; idx++)
     {
-        num[idx] = atoi(namelist[idx]->d_name);
-        printf("num[idx] = %d\n", num[idx]);
+        num[idx] = atoll(namelist[idx]->d_name);
+        printf("num[idx] = %lld\n", num[idx]);
     }
 
     min = num[0];
     
     for(idx = 0; idx < count; idx++)
     {
-        printf("num[idx] = %d\n", num[idx]);
+        printf("num[idx] = %lld\n", num[idx]);
         printf("count = %d\n", count);
         if(num[idx] < min) //num[idx]가 min보다 작다면
             min = num[idx]; //min 에는 num[idx]의 값이 들어감
@@ -177,12 +183,12 @@ int searchOldFolder(char* folderPath)
         }
                 
     }
-    printf("min = %d\n", min);
+    printf("min = %lld\n", min);
 
     idx = 0;
     while(count != 0)
     {
-      sprintf(filePath, "/home/pi/blackBox/blackBox/%d", num[idx]);
+      sprintf(filePath, "/home/pi/blackBox/blackBox/%lld", num[idx]);
       if (unlink(filePath) == -1)
         {
           printf("파일 삭제 실패\n");
@@ -283,16 +289,6 @@ int main(int, char**)
 
     while (1)
     {
-      // 시간정보를 읽어와서 파일명 생성
-      // 전역변수 fileName에 저장
-      getTime(TIME_FILENAME);
-      printf("filePath : %s\n", tBUF);
-      sprintf(filePath, "/home/pi/blackBox/blackBox/%s", tBUF);
-      getTime(FOLDER_NAME);
-      printf("folderPath : %s\n", tBUF);
-      sprintf(folderPath, "%s", tBUF);
-      sprintf(resultPath, "%s/%s", filePath, folderPath);
-      
       MOUNTP *MP;
       if ((MP=dfopen()) == NULL)
       {
@@ -310,7 +306,7 @@ int main(int, char**)
           while (limit_size <= 53)
           {
             int rewinder;
-            rewinder = searchOldFolder(folderPath);
+            rewinder = searchOldFolder(savePath[i++]);
             if (rewinder == 0)
             {
               printf("용량 확보 실패.\n");
@@ -326,9 +322,22 @@ int main(int, char**)
         } 
       }
 
+      // 시간정보를 읽어와서 파일명 생성
+      // 전역변수 fileName에 저장
+      getTime(TIME_FILENAME);
+      printf("filePath : %s\n", tBUF);
+      sprintf(filePath, "/home/pi/blackBox/blackBox/%s", tBUF);
+      getTime(FOLDER_NAME);
+      printf("folderPath : %s\n", tBUF);
+      sprintf(folderPath, "%s", tBUF);
+      sprintf(resultPath, "%s/%s", filePath, folderPath);
+
       if(access(folderPath, F_OK) == -1)
       {
-        mkdir(folderPath, 0755);
+        mkdir(folderPath, 0755); 
+        sprintf(buff, "%d\n", savePath);
+        int j = strlen(buff);
+        savePath[j] = atoi(tBUF);
         writer.open(resultPath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
       }
       else
