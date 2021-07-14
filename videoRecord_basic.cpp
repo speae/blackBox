@@ -224,7 +224,7 @@ int searchOldFolder()
       
     }
     
-    if (count == 0)
+    if (access(deletePath, F_OK) == 0)
     {
       if (rmdir(deletePath) == -1)
       {
@@ -320,7 +320,7 @@ int main(int argc, char* argv[])
           printf("용량이 부족합니다.\n");
           printf("%5f\n", limit_size);
           printf("==================\n\n");
-          while (limit_size <= 53)
+          while (MP->size.ratio <= 53)
           {
             int rewinder;
             if ((rewinder = searchOldFolder()) == 0)
@@ -333,7 +333,7 @@ int main(int argc, char* argv[])
             else
             {
               printf("용량 확보 중...\n");
-              printf("%5f\n", limit_size);
+              printf("%5f\n", MP->size.ratio);
               printf("==================\n\n");
             }
           }
