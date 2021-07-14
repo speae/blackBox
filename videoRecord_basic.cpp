@@ -22,27 +22,41 @@ using namespace std;
 // #define OUTPUT_VIDEO_NAME "test.avi"
 #define VIDEO_WINDOW_NAME "record"
 
-#define TIME_FILENAME 0
-#define FOLDER_NAME 1
-#define LOG_TIME 2
-
-
-
+// mutex 초기화
+static pthread_mutex_t locker;
+  
 // 전역 변수
-char tBUF[100];
+int time_type;
+int thread_number = 0;
+int TIME_FILENAME = 0;
+int FOLDER_NAME = 1;
+int LOG_TIME = 2;
+
+char tBUF[200];
 char buff[200];
 const char* BASEPATH = "/home/pi/blackBox/blackBox/daytime";
+const char* LOGPATH = "/home/pi/blackBox/blackBox/blackBox.log";
 
+// log 파일 작성 시 필요한 전역 변수들
+int fd = open(LOGPATH, O_WRONLY | O_CREAT | O_TRUNC, 0644); 
 int length;
 int WRBytes;
-int fd; 
 
-void getTime(int ret_type){
+void* getTime(void* data){
   
   time_t UTCtime;
   struct tm* tm;    
+  
+  int err;
+  err = pthread_mutex_lock(&locker);
+  if (err)
+  {
+    cout << "ERROR : getTime is unlocked." << endl;
+  }
   time(&UTCtime);
   tm = localtime(&UTCtime);
+  int ret_type = *((int*)data);
+  
   if (ret_type == TIME_FILENAME)
   {
     strftime(tBUF, sizeof(tBUF), "%Y%m%d%H%M%S.avi", tm);
@@ -55,6 +69,14 @@ void getTime(int ret_type){
   {
     strftime(tBUF, sizeof(tBUF), "[%Y-%m-%d %H:%M:%S]", tm);
   }
+
+  err = pthread_mutex_unlock(&locker);
+  if (err)
+  {
+    cout << "ERROR : getTime is locked." << endl;
+  }
+
+  return NULL;
 }
 
 float dfgetRatio(){
@@ -98,6 +120,11 @@ int searchOldFolder(){
     long long num[100];
     int missionSuccess;
     
+    pthread_t t_id;
+    int err;
+
+    pthread_mutex_init(&locker, NULL);
+  
     // 1st : 내가 탐색하고자 하는 폴더
     // 2nd : namelist를 받아올 구조체 주소값
     // 3rd : filter
@@ -106,9 +133,17 @@ int searchOldFolder(){
     if((count = scandir(BASEPATH, &namelist, *filter, alphasort)) == -1) 
     { 
         fprintf(stderr, "%s Directory Scan Error: %s\n", BASEPATH, strerror(errno)); 
-        getTime(LOG_TIME);
+        time_type = LOG_TIME;
+        err = pthread_create(&t_id, NULL, getTime, (void*)&time_type);
+        if (err != 0)
+        {
+          perror("getTime is not created.");
+          exit(1);
+        }
+        pthread_join(t_id, NULL);
         length = sprintf(buff, "%s %s 폴더를 찾는데 실패했습니다.\n", tBUF, BASEPATH);
         WRBytes = write(fd, buff, length);
+        pthread_detach(t_id);
         return 1; 
     } 
     printf("count = %d\n",count);   
@@ -136,9 +171,17 @@ int searchOldFolder(){
     if((count = scandir(deletePath, &namelist, *filter, alphasort)) == -1) 
     { 
       fprintf(stderr, "%s File Scan Error: %s\n", deletePath, strerror(errno)); 
-      getTime(LOG_TIME);
+      time_type = LOG_TIME;
+      err = pthread_create(&t_id, NULL, getTime, (void*)&time_type);
+      if (err != 0)
+      {
+        perror("getTime is not created.");
+        exit(1);
+      }
+      pthread_join(t_id, NULL);
       length = sprintf(buff, "%s %s 파일을 찾는데 실패했습니다.\n", tBUF, deletePath);
       WRBytes = write(fd, buff, length);
+      pthread_detach(t_id);
       return 1; 
     } 
     printf("count = %d\n",count);   
@@ -197,19 +240,35 @@ int main(int argc, char* argv[]){
   
   char filePath[100];
   char folderPath[100];
-
+  char threadBuff[200];
+  
   // 1. VideoCapture("동영상 파일의 경로") 함수 사용
   VideoCapture cap;
   VideoWriter writer;
   Mat frame;
   
-  FILE* fp;   
+  pthread_t t_id;
+  int err;
+
+  pthread_mutex_init(&locker, NULL);
   
   // 로그파일을 기록하기 위해 파일열기
-  fd = open("/home/pi/blackBox/blackBox/blackBox.log", O_WRONLY | O_CREAT | O_TRUNC, 0644);
-  getTime(LOG_TIME);
+  time_type = LOG_TIME;
+  err = pthread_create(&t_id, NULL, getTime, (void*)&time_type);
+  if (err)
+  {
+    perror("getTime is not created.");
+    exit(1);
+  }
+  err = pthread_join(t_id, NULL);
+  if (err)
+  {
+    perror("getTime is not joined.");
+    exit(1);
+  }
   length = sprintf(buff, "%sblackbox log파일 저장을 시작합니다.\n", tBUF);
   WRBytes = write(fd, buff, length);
+  pthread_detach(t_id);
 
   // STEP 1. 카메라 장치 열기
   int deviceID = 0;
@@ -256,10 +315,18 @@ int main(int argc, char* argv[]){
       printf("용량이 부족합니다.\n");
       printf("현재 용량 : %5f%%\n", ratio);
       printf("==================\n\n");
-      getTime(LOG_TIME);
+      time_type = LOG_TIME;
+      err = pthread_create(&t_id, NULL, getTime, (void*)&time_type);
+      if (err != 0)
+      {
+        perror("getTime is not created.");
+        exit(1);
+      }
+      pthread_join(t_id, NULL);
       length = sprintf(buff, "%s %s 녹화 시작 가능까지 %5f%%만큼 용량이 부족합니다.\n", tBUF, BASEPATH, 53.0 - ratio);
       WRBytes = write(fd, buff, length);
-      
+      pthread_detach(t_id);
+
       int rewinder;
       if ((rewinder = searchOldFolder()) == 1)
       {
@@ -267,18 +334,34 @@ int main(int argc, char* argv[]){
         printf("용량 확보 중...\n");
         printf("%5f\n", ratio);
         printf("...\n\n");
-        getTime(LOG_TIME);
+        time_type = LOG_TIME;
+        err = pthread_create(&t_id, NULL, getTime, (void*)&time_type);
+        if (err != 0)
+        {
+          perror("getTime is not created.");
+          exit(1);
+        }
+        pthread_join(t_id, NULL);
         length = sprintf(buff, "%s %s 용량 확보 중... 현재 %5f%%\n", tBUF, BASEPATH, ratio);
         WRBytes = write(fd, buff, length);
+        pthread_detach(t_id);
       }
       else
       {
         printf("용량 확보 실패.\n");
         printf("%5f\n", ratio);
         printf("==================\n\n");
-        getTime(LOG_TIME);
+        time_type = LOG_TIME;
+        err = pthread_create(&t_id, NULL, getTime, (void*)&time_type);
+        if (err != 0)
+        {
+          perror("getTime is not created.");
+          exit(1);
+        }
+        pthread_join(t_id, NULL);
         length = sprintf(buff, "%s %s 용량 확보 실패... %5f%%\n", tBUF, BASEPATH, ratio);
         WRBytes = write(fd, buff, length);
+        pthread_detach(t_id);
         break;
       }
     }
@@ -286,27 +369,67 @@ int main(int argc, char* argv[]){
     printf("용량이 충분합니다.\n");
     printf("%5f\n", ratio);
     printf("==================\n\n");
-    getTime(LOG_TIME);
+    time_type = LOG_TIME;
+    err = pthread_create(&t_id, NULL, getTime, (void*)&time_type);
+    if (err != 0)
+    {
+      perror("getTime is not created.");
+      exit(1);
+    }
+    pthread_join(t_id, NULL);
     length = sprintf(buff, "%s %s 용량 : %5f%% --> 충분합니다.\n", tBUF, BASEPATH, ratio);
     WRBytes = write(fd, buff, length);
-  
+    pthread_detach(t_id);
+
     // 시간정보를 읽어와서 파일명 생성
     // 전역변수 fileName에 저장
-    getTime(FOLDER_NAME);
+    time_type = FOLDER_NAME;
+    err = pthread_create(&t_id, NULL, getTime, (void*)&time_type);
+    if (err != 0)
+    {
+      perror("getTime is not created.");
+      exit(1);
+    }
+    pthread_join(t_id, NULL);
     sprintf(folderPath, "%s/%s", BASEPATH, tBUF);
     printf("folderPath : %s\n", folderPath);
-    
-    getTime(LOG_TIME);
+    pthread_detach(t_id);
+
+    time_type = LOG_TIME;
+    err = pthread_create(&t_id, NULL, getTime, (void*)&time_type);
+    if (err != 0)
+    {
+      perror("getTime is not created.");
+      exit(1);
+    }
+    pthread_join(t_id, NULL);
     length = sprintf(buff, "%s %s 명으로 폴더가 생성되거나 파일이 이동합니다.\n", tBUF, folderPath);
     WRBytes = write(fd, buff, length);
+    pthread_detach(t_id);
 
-    getTime(TIME_FILENAME);
+    time_type = TIME_FILENAME;
+    err = pthread_create(&t_id, NULL, getTime, (void*)&time_type);
+    if (err != 0)
+    {
+      perror("getTime is not created.");
+      exit(1);
+    }
+    pthread_join(t_id, NULL);
     sprintf(filePath, "%s/%s", folderPath, tBUF);
     printf("filePath : %s\n", filePath);
-    
-    getTime(LOG_TIME);
+    pthread_detach(t_id);
+
+    time_type = LOG_TIME;
+    err = pthread_create(&t_id, NULL, getTime, (void*)&time_type);
+    if (err != 0)
+    {
+      perror("getTime is not created.");
+      exit(1);
+    }
+    pthread_join(t_id, NULL);
     length = sprintf(buff, "%s %s 명으로 녹화를 시작합니다.\n", tBUF, filePath);
     WRBytes = write(fd, buff, length);
+    pthread_detach(t_id);
 
     if(access(folderPath, F_OK) == -1)
     {
@@ -321,9 +444,17 @@ int main(int argc, char* argv[]){
     if (!writer.isOpened())
     {
       perror("Can't write video");
-      getTime(LOG_TIME);
+      time_type = LOG_TIME;
+      err = pthread_create(&t_id, NULL, getTime, (void*)&time_type);
+      if (err != 0)
+      {
+        perror("getTime is not created.");
+        exit(1);
+      }
+      pthread_join(t_id, NULL);
       length = sprintf(buff, "%s %s 파일 생성 실패.\n", tBUF, filePath);
       WRBytes = write(fd, buff, length);
+      pthread_detach(t_id);
       return -1;
     }
 
@@ -340,9 +471,17 @@ int main(int argc, char* argv[]){
 
       if (frame.empty()) {
         perror("ERROR! blank frame grabbed\n");
-        getTime(LOG_TIME);
+        time_type = LOG_TIME;
+        err = pthread_create(&t_id, NULL, getTime, (void*)&time_type);
+        if (err != 0)
+        {
+          perror("getTime is not created.");
+          exit(1);
+        }
+        pthread_join(t_id, NULL);
         length = sprintf(buff, "%s %s 이미지 읽기 실패.\n", tBUF, filePath);
         WRBytes = write(fd, buff, length);
+        pthread_detach(t_id);
         break;
       } 
 
@@ -353,9 +492,17 @@ int main(int argc, char* argv[]){
       {
         printf("Stop video record\n");
         exitFlag = 1;
-        getTime(LOG_TIME);
+        time_type = LOG_TIME;
+        err = pthread_create(&t_id, NULL, getTime, (void*)&time_type);
+        if (err != 0)
+        {
+          perror("getTime is not created.");
+          exit(1);
+        }
+        pthread_join(t_id, NULL);
         length = sprintf(buff, "%s %s 동영상 종료.\n", tBUF, filePath);
         WRBytes = write(fd, buff, length);
+        pthread_detach(t_id);
         break;
       }   
     }
