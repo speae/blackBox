@@ -178,7 +178,7 @@ int searchOldFolder(){
       }              
     }
   
-    //  
+    // 가장 작은 이름의 폴더를 찾아 하위 파일 개수를 구하고 각 파일의 이름을 namelist에 저장
     char deletePath[100];
     sprintf(deletePath, "%s/%lld", BASEPATH, min);  
     printf("deletePath = %s\n", deletePath);
@@ -324,7 +324,7 @@ int main(int argc, char* argv[]){
   { 
     float ratio = dfgetRatio();  
     
-    while (ratio <= 50.0)
+    while (ratio <= 15.0)
     { 
       printf("용량이 부족합니다.\n");
       printf("현재 용량 : %5f%%\n", ratio);
@@ -447,14 +447,20 @@ int main(int argc, char* argv[]){
     
     if(access(BASEPATH, F_OK) == -1)
     {
-      mkdir(BASEPATH, 0755);    
+      mkdir(BASEPATH, 0755); 
+      mkdir(folderPath, 0755);    
+      writer.open(filePath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);   
     }
-    if(access(folderPath, F_OK) == -1)
+    else if(access(folderPath, F_OK) == -1)
     {
-      mkdir(folderPath, 0755);
-      writer.open(filePath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);    
+      mkdir(folderPath, 0755);    
+      writer.open(filePath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
     }
-    
+    else
+    {
+      writer.open(filePath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
+    }
+  
     if (!writer.isOpened())
     {
       perror("Can't write video");
