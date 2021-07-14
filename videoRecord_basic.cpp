@@ -40,7 +40,7 @@ int LOG_TIME = 2;
 // 경로 저장 전역 변수 및 절대 경로
 char tBUF[200];
 char buff[200];
-const char* BASEPATH = "/home/pi/blackBox/blackBox/daytime2";
+const char* BASEPATH = "/home/pi/blackBox/blackBox/daytime";
 const char* LOGPATH = "/home/pi/blackBox/blackBox/blackBox.log";
 
 // log 파일 작성 시 필요한 전역 변수들
@@ -324,7 +324,7 @@ int main(int argc, char* argv[]){
   { 
     float ratio = dfgetRatio();  
     
-    while (ratio <= 53.0)
+    while (ratio <= 50.0)
     { 
       printf("용량이 부족합니다.\n");
       printf("현재 용량 : %5f%%\n", ratio);
@@ -451,14 +451,10 @@ int main(int argc, char* argv[]){
     }
     if(access(folderPath, F_OK) == -1)
     {
-      mkdir(folderPath, 0755);    
-      writer.open(filePath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
+      mkdir(folderPath, 0755);
+      writer.open(filePath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);    
     }
-    else
-    {
-      writer.open(filePath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
-    }
-  
+    
     if (!writer.isOpened())
     {
       perror("Can't write video");
