@@ -2,6 +2,7 @@
 #include <opencv2/videoio.hpp>
 #include <opencv2/highgui.hpp>
 #include <iostream>
+#include <pthread.h> 
 #include <dirent.h> 
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,12 +26,11 @@ using namespace std;
 #define FOLDER_NAME 1
 #define LOG_TIME 2
 
+
+
+// 전역 변수
 char tBUF[100];
-char filePath[100];
-char folderPath[100];
-char resultPath[100];
 char buff[200];
-const char* MMOUNT = "/";
 const char* BASEPATH = "/home/pi/blackBox/blackBox/daytime";
 
 int length;
@@ -57,14 +57,13 @@ void getTime(int ret_type){
   }
 }
 
-float dfgetRatio()
-{
+float dfgetRatio(){
+
   struct statfs lstatfs;
+  const char* MMOUNT = "/";
   float result;
-  int boolean;
-  statfs(MMOUNT, &lstatfs);
-  result = (lstatfs.f_bavail * 100.0) / lstatfs.f_blocks;
   
+  int boolean;
   boolean = statfs(MMOUNT, &lstatfs);
   if (boolean == 0)
   {
@@ -90,8 +89,8 @@ static int filter(const struct dirent* dirent){
     return result;
 }
 
-int searchOldFolder() 
-{ 
+int searchOldFolder(){
+
     struct dirent **namelist; 
     int count; 
     int idx; 
@@ -134,9 +133,7 @@ int searchOldFolder()
     char deletePath[100];
     sprintf(deletePath, "%s/%lld", BASEPATH, min);  
     printf("deletePath = %s\n", deletePath);
-    const char* constDeletePath = deletePath;
-    printf("constDeletePath = %s\n", constDeletePath);
-    if((count = scandir(constDeletePath, &namelist, *filter, alphasort)) == -1) 
+    if((count = scandir(deletePath, &namelist, *filter, alphasort)) == -1) 
     { 
       fprintf(stderr, "%s File Scan Error: %s\n", deletePath, strerror(errno)); 
       getTime(LOG_TIME);
@@ -196,8 +193,11 @@ int searchOldFolder()
     return missionSuccess; 
 }
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]){
+  
+  char filePath[100];
+  char folderPath[100];
+
   // 1. VideoCapture("동영상 파일의 경로") 함수 사용
   VideoCapture cap;
   VideoWriter writer;

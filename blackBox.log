@@ -1,8 +1,5 @@
-[2021-07-14 14:14:06]blackbox log파일 저장을 시작합니다.
-[2021-07-14 14:14:06] /home/pi/blackBox/blackBox/daytime 용량 : 53.020332% --> 충분합니다.
-[2021-07-14 14:14:06] /home/pi/blackBox/blackBox/daytime/2021071414 명으로 폴더가 생성되거나 파일이 이동합니다.
-[2021-07-14 14:14:06] /home/pi/blackBox/blackBox/daytime/2021071414/20210714141406.avi 명으로 녹화를 시작합니다.
-[2021-07-14 14:15:06] /home/pi/blackBox/blackBox/daytime 용량 : 53.012726% --> 충분합니다.
-[2021-07-14 14:15:06] /home/pi/blackBox/blackBox/daytime/2021071414 명으로 폴더가 생성되거나 파일이 이동합니다.
-[2021-07-14 14:15:06] /home/pi/blackBox/blackBox/daytime/2021071414/20210714141506.avi 명으로 녹화를 시작합니다.
-[2021-07-14 14:15:37] /home/pi/blackBox/blackBox/daytime/2021071414/20210714141506.avi 동영상 종료.
+[2021-07-14 14:29:52]blackbox log파일 저장을 시작합니다.
+[2021-07-14 14:29:52] /home/pi/blackBox/blackBox/daytime 용량 : 53.176079% --> 충분합니다.
+[2021-07-14 14:29:52] /home/pi/blackBox/blackBox/daytime/2021071414 명으로 폴더가 생성되거나 파일이 이동합니다.
+[2021-07-14 14:29:52] /home/pi/blackBox/blackBox/daytime/2021071414/20210714142952.avi 명으로 녹화를 시작합니다.
+[2021-07-14 14:30:35] /home/pi/blackBox/blackBox/daytime/2021071414/20210714142952.avi 동영상 종료.
