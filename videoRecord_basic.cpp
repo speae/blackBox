@@ -31,7 +31,6 @@ char folderPath[100];
 char resultPath[100];
 int savePath[100] = {2021071317, 2021071319};
 char buff[200];
-int i = 0;
 const char* MMOUNT = "/proc/mounts";
 const char* BASEPATH = "/home/pi/blackBox/blackBox/daytime";
 
@@ -250,194 +249,185 @@ int searchOldFolder()
     return missionSuccess; 
 }
 
-void confirmRepeat(MOUNTP* MP)
-{ 
-  int rewinder;
-  if ((rewinder = searchOldFolder()) == 0)
-  {
-    printf("용량 확보 실패.\n");
-    getTime(LOG_TIME);
-    length = sprintf(buff, "%s %s 용량 확보 실패.\n", tBUF, BASEPATH);
-    WRBytes = write(fd, buff, length);
-    exit(1);
-  }
-  else
-  {
-    if (dfget(MP))
-    {
-      printf("용량 확보 중...\n");
-      printf("%5f\n", MP->size.ratio);
-      printf("...\n\n");
-      getTime(LOG_TIME);
-      length = sprintf(buff, "%s %s 용량 확보 중...\n", tBUF, BASEPATH);
-      WRBytes = write(fd, buff, length);
-      if (MP->size.ratio <= 53)
-      {
-        confirmRepeat(MP);
-      }
-    }
-  }  
-}
-
 int main(int argc, char* argv[])
 {
-    // 1. VideoCapture("동영상 파일의 경로") 함수 사용
-    VideoCapture cap;
-    VideoWriter writer;
-    Mat frame;
-    
-    FILE* fp;   
-    
-    // 로그파일을 기록하기 위해 파일열기
-    fd = open("/home/pi/blackBox/blackBox/blackBox.log", O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    getTime(LOG_TIME);
-    length = sprintf(buff, "%sblackbox log파일 저장을 시작합니다.\n", tBUF);
-    WRBytes = write(fd, buff, length);
+  // 1. VideoCapture("동영상 파일의 경로") 함수 사용
+  VideoCapture cap;
+  VideoWriter writer;
+  Mat frame;
+  
+  FILE* fp;   
+  
+  // 로그파일을 기록하기 위해 파일열기
+  fd = open("/home/pi/blackBox/blackBox/blackBox.log", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  getTime(LOG_TIME);
+  length = sprintf(buff, "%sblackbox log파일 저장을 시작합니다.\n", tBUF);
+  WRBytes = write(fd, buff, length);
 
-    // STEP 1. 카메라 장치 열기
-    int deviceID = 0;
-    int apiID = CAP_V4L2;
-    int maxFrame = 1440;
-    int frameCount;
-    int exitFlag = 0;
-    
-    cap.open(deviceID, apiID);
+  // STEP 1. 카메라 장치 열기
+  int deviceID = 0;
+  int apiID = CAP_V4L2;
+  int maxFrame = 1440;
+  int frameCount;
+  int exitFlag = 0;
+  
+  cap.open(deviceID, apiID);
 
-    if (!cap.isOpened()) {
-        perror("ERROR! Unable to open camera.\n");
-        return -1;
-    }
+  if (!cap.isOpened()) {
+      perror("ERROR! Unable to open camera.\n");
+      return -1;
+  }
 
-    cap.set(CAP_PROP_FPS, 24);
-    cap.set(CAP_PROP_FRAME_WIDTH, 320);
-    cap.set(CAP_PROP_FRAME_HEIGHT, 240);
-    
-    // Video Recording
-    // 현재 카메라에서 초당 몇 프레임으로 출력하는지 확인
-    // CAP_PROP_FPS 값을 5라고 정의 
-    float videoFPS = cap.get(CAP_PROP_FPS);
+  cap.set(CAP_PROP_FPS, 24);
+  cap.set(CAP_PROP_FRAME_WIDTH, 320);
+  cap.set(CAP_PROP_FRAME_HEIGHT, 240);
+  
+  // Video Recording
+  // 현재 카메라에서 초당 몇 프레임으로 출력하는지 확인
+  // CAP_PROP_FPS 값을 5라고 정의 
+  float videoFPS = cap.get(CAP_PROP_FPS);
 
-    // 해상도
-    int videoWidth = cap.get(CAP_PROP_FRAME_WIDTH);
-    int videoHeight = cap.get(CAP_PROP_FRAME_HEIGHT);
-    
-    printf("videoFPGS = %f\n", videoFPS);
-    printf("width = %d, height = %d\n", videoWidth, videoHeight);
-    
-    // 1st : 저장하고자 하는 파일명
-    // 2nd : 코덱 지정
-    // 3rd : FPS
-    // 4th : ImageSize
-    // 5th : isColor = True
+  // 해상도
+  int videoWidth = cap.get(CAP_PROP_FRAME_WIDTH);
+  int videoHeight = cap.get(CAP_PROP_FRAME_HEIGHT);
+  
+  printf("videoFPGS = %f\n", videoFPS);
+  printf("width = %d, height = %d\n", videoWidth, videoHeight);
+  
+  // 1st : 저장하고자 하는 파일명
+  // 2nd : 코덱 지정
+  // 3rd : FPS
+  // 4th : ImageSize
+  // 5th : isColor = True
 
-    float limit_size = 0.0f;
+  float limit_size = 0.0f;
 
-    while (1)
+  while (1)
+  {
+    MOUNTP *MP;
+    if ((MP=dfopen()) == NULL)
     {
-      MOUNTP *MP;
-      if ((MP=dfopen()) == NULL)
-      {
-          perror("error");
-          exit(1);
-      }
- 
-      if (dfget(MP))
-      {
-        if (MP->size.ratio <= 53)
-        { 
-          printf("용량이 부족합니다.\n");
+        perror("error");
+        exit(1);
+    }
+    if ((dfget(MP)) != NULL)
+    {
+      while (MP->size.ratio <= 53)
+      { 
+        printf("용량이 부족합니다.\n");
+        printf("%5f\n", MP->size.ratio);
+        printf("==================\n\n");
+        getTime(LOG_TIME);
+        length = sprintf(buff, "%s %s 용량이 부족합니다.\n", tBUF, BASEPATH);
+        WRBytes = write(fd, buff, length);
+        
+        int rewinder;
+        if ((rewinder = searchOldFolder()) == 1)
+        {
+          dfget(MP);
+          printf("용량 확보 중...\n");
           printf("%5f\n", MP->size.ratio);
-          printf("==================\n\n");
-          confirmRepeat(MP);      
+          printf("...\n\n");
+          getTime(LOG_TIME);
+          length = sprintf(buff, "%s %s 용량 확보 중...\n", tBUF, BASEPATH);
+          WRBytes = write(fd, buff, length);
         }
         else
         {
-          printf("용량을 확보했습니다.\n");
-          printf("%5f\n", limit_size);
+          printf("용량 확보 실패.\n");
+          printf("%5f\n", MP->size.ratio);
           printf("==================\n\n");
           getTime(LOG_TIME);
-          length = sprintf(buff, "%s %s 용량 확보 성공.\n", tBUF, BASEPATH);
-          WRBytes = write(fd, buff, length);
-        } 
-      }
-
-      // 시간정보를 읽어와서 파일명 생성
-      // 전역변수 fileName에 저장
-      getTime(FOLDER_NAME);
-      sprintf(folderPath, "%s/%s", BASEPATH, tBUF);
-      printf("folderPath : %s\n", folderPath);
-      
-      getTime(LOG_TIME);
-      length = sprintf(buff, "%s %s 명으로 폴더가 생성되거나 파일이 이동합니다.\n", tBUF, folderPath);
-      WRBytes = write(fd, buff, length);
-
-      getTime(TIME_FILENAME);
-      sprintf(filePath, "%s/%s/%s", BASEPATH, folderPath, tBUF);
-      printf("filePath : %s\n", filePath);
-      
-      getTime(LOG_TIME);
-      length = sprintf(buff, "%s %s 명으로 녹화를 시작합니다.\n", tBUF, filePath);
-      WRBytes = write(fd, buff, length);
-
-      if(access(folderPath, F_OK) == -1)
-      {
-        mkdir(folderPath, 0755);    
-        writer.open(filePath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
-      }
-      else
-      {
-        writer.open(filePath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
-      }
-      
-      if (!writer.isOpened())
-      {
-        perror("Can't write video");
-        getTime(LOG_TIME);
-        length = sprintf(buff, "%s %s 파일 생성 실패.\n", tBUF, filePath);
-        WRBytes = write(fd, buff, length);
-        return -1;
-      }
-
-      frameCount = 0;
-      
-      // 창 생성
-      namedWindow(VIDEO_WINDOW_NAME);
-
-      while (frameCount < maxFrame)
-      {
-        // 카메라에서 매 프레임마다 이미지 읽기
-        cap.read(frame);     
-        frameCount++;
-
-        if (frame.empty()) {
-          perror("ERROR! blank frame grabbed\n");
-          getTime(LOG_TIME);
-          length = sprintf(buff, "%s %s 이미지 읽기 실패.\n", tBUF, filePath);
+          length = sprintf(buff, "%s %s 용량 확보 실패.\n", tBUF, BASEPATH);
           WRBytes = write(fd, buff, length);
           break;
-        }  
-
-        if (waitKey(10) == 27)
-        {
-          printf("Stop video record\n");
-          exitFlag = 1;
-          getTime(LOG_TIME);
-          length = sprintf(buff, "%s %s 동영상 종료.\n", tBUF, filePath);
-          WRBytes = write(fd, buff, length);
-          break;
-        }   
+        }
       }
+    }  
+    printf("용량이 충분합니다.\n");
+    printf("%5f\n", MP->size.ratio);
+    printf("==================\n\n");
+    getTime(LOG_TIME);
+    length = sprintf(buff, "%s %s 용량 확보 성공.\n", tBUF, BASEPATH);
+    WRBytes = write(fd, buff, length);
+  
+    // 시간정보를 읽어와서 파일명 생성
+    // 전역변수 fileName에 저장
+    getTime(FOLDER_NAME);
+    sprintf(folderPath, "%s/%s", BASEPATH, tBUF);
+    printf("folderPath : %s\n", folderPath);
+    
+    getTime(LOG_TIME);
+    length = sprintf(buff, "%s %s 명으로 폴더가 생성되거나 파일이 이동합니다.\n", tBUF, folderPath);
+    WRBytes = write(fd, buff, length);
 
-      writer.release();
-      if (exitFlag == 1){
-        break;
-      }
+    getTime(TIME_FILENAME);
+    sprintf(filePath, "%s/%s/%s", BASEPATH, folderPath, tBUF);
+    printf("filePath : %s\n", filePath);
+    
+    getTime(LOG_TIME);
+    length = sprintf(buff, "%s %s 명으로 녹화를 시작합니다.\n", tBUF, filePath);
+    WRBytes = write(fd, buff, length);
+
+    if(access(folderPath, F_OK) == -1)
+    {
+      mkdir(folderPath, 0755);    
+      writer.open(filePath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
+    }
+    else
+    {
+      writer.open(filePath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
+    }
+    
+    if (!writer.isOpened())
+    {
+      perror("Can't write video");
+      getTime(LOG_TIME);
+      length = sprintf(buff, "%s %s 파일 생성 실패.\n", tBUF, filePath);
+      WRBytes = write(fd, buff, length);
+      return -1;
     }
 
-    cap.release();
+    frameCount = 0;
+    
+    // 창 생성
+    namedWindow(VIDEO_WINDOW_NAME);
 
-    // 창 삭제
-    destroyWindow(VIDEO_WINDOW_NAME);
-     
-    return 0;
+    while (frameCount < maxFrame)
+    {
+      // 카메라에서 매 프레임마다 이미지 읽기
+      cap.read(frame);     
+      frameCount++;
+
+      if (frame.empty()) {
+        perror("ERROR! blank frame grabbed\n");
+        getTime(LOG_TIME);
+        length = sprintf(buff, "%s %s 이미지 읽기 실패.\n", tBUF, filePath);
+        WRBytes = write(fd, buff, length);
+        break;
+      }  
+
+      if (waitKey(10) == 27)
+      {
+        printf("Stop video record\n");
+        exitFlag = 1;
+        getTime(LOG_TIME);
+        length = sprintf(buff, "%s %s 동영상 종료.\n", tBUF, filePath);
+        WRBytes = write(fd, buff, length);
+        break;
+      }   
+    }
+
+    writer.release();
+    if (exitFlag == 1){
+      break;
+    }
+  }
+
+  cap.release();
+
+  // 창 삭제
+  destroyWindow(VIDEO_WINDOW_NAME);
+    
+  return 0;
 }
