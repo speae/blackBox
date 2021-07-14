@@ -30,9 +30,15 @@ char filePath[100];
 char folderPath[100];
 char resultPath[100];
 int savePath[100] = {2021071317, 2021071319};
+char buff[200];
 int i = 0;
 const char* MMOUNT = "/proc/mounts";
 const char* BASEPATH = "/home/pi/blackBox/blackBox/daytime";
+
+int length;
+int WRBytes;
+int fd; 
+
 void getTime(int ret_type){
   
   time_t UTCtime;
@@ -109,7 +115,7 @@ MOUNTP *dfget(MOUNTP *MP)
                 statfs(MP->mountdir, &lstatfs);
                 MP->size.blocks = lstatfs.f_blocks * (lstatfs.f_bsize/1024); 
                 MP->size.avail  = lstatfs.f_bavail * (lstatfs.f_bsize/1024); 
-                MP->size.ratio = (MP->size.avail * 100) / MP->size.blocks;
+                MP->size.ratio = (MP->size.avail * 100.0) / MP->size.blocks;
                 return MP;
             }
             break;
@@ -136,12 +142,13 @@ static int filter(const struct dirent* dirent){
     return result;
 }
 
-int searchOldFolder(int savePath) 
+int searchOldFolder() 
 { 
     struct dirent **namelist; 
     int count; 
     int idx; 
-    long long min = 0;
+    long long folder_min = 0;
+    long long file_min = 0;
     long long num[100];
     int missionSuccess;
     
@@ -154,44 +161,64 @@ int searchOldFolder(int savePath)
     if((count = scandir(BASEPATH, &namelist, *filter, alphasort)) == -1) 
     { 
         fprintf(stderr, "%s Directory Scan Error: %s\n", BASEPATH, strerror(errno)); 
+        getTime(LOG_TIME);
+        length = sprintf(buff, "%s %s 폴더를 찾는데 실패했습니다.\n", tBUF, BASEPATH);
+        WRBytes = write(fd, buff, length);
         return 1; 
     } 
-    printf("count = %d\n",count);    
-    
+    printf("count = %d\n",count);   
+
     for(idx=0; idx<count; idx++)
     {
         num[idx] = atoll(namelist[idx]->d_name);
-        printf("num[idx] = %lld\n", num[idx]);
     }
 
-    min = num[0];
+    folder_min = num[0];
     
     for(idx = 0; idx < count; idx++)
     {
-        printf("num[idx] = %lld\n", num[idx]);
-        printf("count = %d\n", count);
-        if(num[idx] < min) //num[idx]가 min보다 작다면
-            min = num[idx]; //min 에는 num[idx]의 값이 들어감
+        if(num[idx] < folder_min) //num[idx]가 min보다 작다면
+          folder_min = num[idx]; //min 에는 num[idx]의 값이 들어감
         else
         {
-            continue;
+          continue;
         }
                 
     }
-    printf("min = %lld\n", min);
+  
+    char deletePath[100];
+    sprintf(deletePath, "%s/%lld", BASEPATH, folder_min);  
+    printf("deletePath = %s\n", deletePath);
+    const char* constDeletePath = deletePath;
+    printf("constDeletePath = %s\n", constDeletePath);
+    if((count = scandir(constDeletePath, &namelist, *filter, alphasort)) == -1) 
+    { 
+      fprintf(stderr, "%s File Scan Error: %s\n", deletePath, strerror(errno)); 
+      getTime(LOG_TIME);
+      length = sprintf(buff, "%s %s 파일을 찾는데 실패했습니다.\n", tBUF, deletePath);
+      WRBytes = write(fd, buff, length);
+      return 1; 
+    } 
+    printf("count = %d\n",count);   
 
-    idx = 0;
-    while(count != 0)
+    for(idx = 0; idx < count; idx++)
     {
-      sprintf(filePath, "%s/%lld", BASEPATH, num[idx]);
-      if (unlink(filePath) == -1)
+      num[idx] = atoll(namelist[idx]->d_name);
+    }
+    
+    char deleteFile[100];
+    idx = 0;
+    while(idx != count)
+    {
+      sprintf(deleteFile, "%s/%lld/%lld.avi", BASEPATH, folder_min, num[idx]);  
+      if (unlink(deleteFile) == -1)
       {
-        printf("파일 삭제 실패\n");
-        missionSuccess = 0;
+        printf("%s 삭제 실패.\n", deleteFile);
+        break;
       }
       else
       {
-        printf("파일 삭제 성공\n");
+        printf("%s 삭제 성공.\n", deleteFile);
         idx++;
       }
       
@@ -199,14 +226,14 @@ int searchOldFolder(int savePath)
     
     if (count == 0)
     {
-      if (rmdir(folderPath) == -1)
+      if (rmdir(deletePath) == -1)
       {
-        printf("폴더 삭제 실패\n");
+        printf("%s 삭제 실패\n", deletePath);
         missionSuccess = 0; 
       }
       else
       {
-        printf("폴더 삭제 성공\n");
+        printf("%s 삭제 성공\n", deletePath);
         missionSuccess = 1;
       }
       
@@ -224,18 +251,13 @@ int searchOldFolder(int savePath)
     return missionSuccess; 
 }
 
-int main(int, char**)
+int main(int argc, char* argv[])
 {
     // 1. VideoCapture("동영상 파일의 경로") 함수 사용
     VideoCapture cap;
     VideoWriter writer;
     Mat frame;
-    int fd;
-    char buff[200];
-      
-    int length;
-    int WRBytes;
-
+    
     FILE* fp;   
     
     // 로그파일을 기록하기 위해 파일열기
@@ -254,7 +276,7 @@ int main(int, char**)
     cap.open(deviceID, apiID);
 
     if (!cap.isOpened()) {
-        perror("ERROR! Unable to open camera\n");
+        perror("ERROR! Unable to open camera.\n");
         return -1;
     }
 
@@ -301,12 +323,19 @@ int main(int, char**)
           while (limit_size <= 53)
           {
             int rewinder;
-            rewinder = searchOldFolder(savePath[i++]);
-            if (rewinder == 0)
+            if ((rewinder = searchOldFolder()) == 0)
             {
               printf("용량 확보 실패.\n");
+              getTime(LOG_TIME);
+              length = sprintf(buff, "%s %s 용량 확보 실패.\n", tBUF, BASEPATH);
+              WRBytes = write(fd, buff, length);
             }
-            
+            else
+            {
+              printf("용량 확보 중...\n");
+              printf("%5f\n", limit_size);
+              printf("==================\n\n");
+            }
           }
         }
         else
@@ -314,26 +343,28 @@ int main(int, char**)
           printf("용량을 확보했습니다.\n");
           printf("%5f\n", limit_size);
           printf("==================\n\n");
+          getTime(LOG_TIME);
+          length = sprintf(buff, "%s %s 용량 확보 성공.\n", tBUF, BASEPATH);
+          WRBytes = write(fd, buff, length);
         } 
       }
 
       // 시간정보를 읽어와서 파일명 생성
       // 전역변수 fileName에 저장
-      getTime(TIME_FILENAME);
-      printf("filePath : %s\n", tBUF);
-      sprintf(filePath, "%s/%s", BASEPATH, tBUF);
-
-      getTime(LOG_TIME);
-      length = sprintf(buff, "%s %s 명으로 녹화를 시작합니다.\n", tBUF, filePath);
-      
       getTime(FOLDER_NAME);
-      printf("folderPath : %s\n", tBUF);
       sprintf(folderPath, "%s/%s", BASEPATH, tBUF);
+      printf("folderPath : %s\n", folderPath);
       
       getTime(LOG_TIME);
       length = sprintf(buff, "%s %s 명으로 폴더가 생성되거나 파일이 이동합니다.\n", tBUF, folderPath);
       WRBytes = write(fd, buff, length);
+
+      getTime(TIME_FILENAME);
+      sprintf(filePath, "%s/%s", BASEPATH, tBUF);
+      printf("filePath : %s\n", filePath);
       
+      getTime(LOG_TIME);
+      length = sprintf(buff, "%s %s 명으로 녹화를 시작합니다.\n", tBUF, filePath);
       WRBytes = write(fd, buff, length);
 
       if(access(folderPath, F_OK) == -1)
@@ -349,6 +380,9 @@ int main(int, char**)
       if (!writer.isOpened())
       {
         perror("Can't write video");
+        getTime(LOG_TIME);
+        length = sprintf(buff, "%s %s 파일 생성 실패.\n", tBUF, filePath);
+        WRBytes = write(fd, buff, length);
         return -1;
       }
 
@@ -365,26 +399,23 @@ int main(int, char**)
 
         if (frame.empty()) {
           perror("ERROR! blank frame grabbed\n");
+          getTime(LOG_TIME);
+          length = sprintf(buff, "%s %s 이미지 읽기 실패.\n", tBUF, filePath);
+          WRBytes = write(fd, buff, length);
           break;
         }  
 
-        // 읽어온 한 장의 프레임을 writer에 쓰기
-        writer << frame; // test.avi
-        imshow(VIDEO_WINDOW_NAME, frame);
-
-        // ESC => 27; 'ESC' 키가 입력되면 종료
-        // 키 입력을 확인
-        // 카메라 영상에서 esc 키를 누를것
         if (waitKey(10) == 27)
         {
           printf("Stop video record\n");
           exitFlag = 1;
+          getTime(LOG_TIME);
+          length = sprintf(buff, "%s %s 동영상 종료.\n", tBUF, filePath);
+          WRBytes = write(fd, buff, length);
           break;
         }   
       }
 
-      
-      
       writer.release();
       if (exitFlag == 1){
         break;
