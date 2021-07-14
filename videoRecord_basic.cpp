@@ -18,27 +18,26 @@
 #include <fcntl.h> // O_WRONLY
 #include <unistd.h> // write(), read()
 
+// 네임스페이스 선언 <-- 충돌 방지
 using namespace cv;
 using namespace std;
 
 // "202107121433.avi"
 // #define OUTPUT_VIDEO_NAME "test.avi"
+// 카메라 화면 상단에 record 표시
 #define VIDEO_WINDOW_NAME "record"
-
-// 공유 메모리를 이용하여 멀티 프로세스 구현
-#define SHMSIZE 100
-#define KeyValue 0x1234
 
 // mutex 초기화
 static pthread_mutex_t locker;
   
-// 전역 변수
+// getTime 멀티 스레드 data
 int time_type;
 int thread_number = 0;
 int TIME_FILENAME = 0;
 int FOLDER_NAME = 1;
 int LOG_TIME = 2;
 
+// 경로 저장 전역 변수 및 절대 경로
 char tBUF[200];
 char buff[200];
 const char* BASEPATH = "/home/pi/blackBox/blackBox/daytime2";
@@ -49,6 +48,7 @@ int fd = open(LOGPATH, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 int length;
 int WRBytes;
 
+// 시간을 파일명으로
 void* getTime(void* data){
   
   time_t UTCtime;
@@ -86,6 +86,7 @@ void* getTime(void* data){
   return NULL;
 }
 
+// ratio 값 얻기
 float dfgetRatio(){
 
   struct statfs lstatfs;
@@ -107,6 +108,7 @@ float dfgetRatio(){
   return result;
 }
 
+// 필터 -> 1을 반환해야 필터 설정됨
 static int filter(const struct dirent* dirent){
     
     int result;
@@ -118,6 +120,7 @@ static int filter(const struct dirent* dirent){
     return result;
 }
 
+// 가장 먼저 생성된 폴더를 찾아 삭제
 int searchOldFolder(){
 
     struct dirent **namelist; 
@@ -137,6 +140,8 @@ int searchOldFolder(){
     // 3rd : filter
     // 4th : 알파벳 정렬
     // scandir()함수에서 namelist 메모리를 malloc
+    // 경로 
+    // 여기서 count는 필요 x
     if((count = scandir(BASEPATH, &namelist, *filter, alphasort)) == -1) 
     { 
         fprintf(stderr, "%s Directory Scan Error: %s\n", BASEPATH, strerror(errno)); 
@@ -155,6 +160,7 @@ int searchOldFolder(){
     } 
     printf("count = %d\n",count);   
 
+    // 가장 작은 폴더명
     for(idx = 0; idx < count; idx++)
     {
         num[idx] = atoll(namelist[idx]->d_name);
@@ -172,6 +178,7 @@ int searchOldFolder(){
       }              
     }
   
+    //  
     char deletePath[100];
     sprintf(deletePath, "%s/%lld", BASEPATH, min);  
     printf("deletePath = %s\n", deletePath);
