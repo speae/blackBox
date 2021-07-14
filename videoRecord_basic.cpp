@@ -59,23 +59,22 @@ void getTime(int ret_type){
 
 float dfgetRatio()
 {
-    
   struct statfs lstatfs;
   float result;
   int boolean;
   statfs(MMOUNT, &lstatfs);
   result = (lstatfs.f_bavail * 100.0) / lstatfs.f_blocks;
   
-  // boolean = statfs(MMOUNT, &lstatfs);
-  // if (boolean == 0)
-  // {
-  //   result = (lstatfs.f_bavail * 100.0) / lstatfs.f_blocks;
-  // }
-  // else
-  // {
-  //   perror("ERROR! Unable mount to root.\n");
-  //   exit(1);
-  // }
+  boolean = statfs(MMOUNT, &lstatfs);
+  if (boolean == 0)
+  {
+    result = (lstatfs.f_bavail * 100.0) / lstatfs.f_blocks;
+  }
+  else
+  {
+    perror("ERROR! Unable mount to root.\n");
+    exit(1);
+  }
 
   return result;
 }
@@ -105,7 +104,6 @@ int searchOldFolder()
     // 3rd : filter
     // 4th : 알파벳 정렬
     // scandir()함수에서 namelist 메모리를 malloc
-    
     if((count = scandir(BASEPATH, &namelist, *filter, alphasort)) == -1) 
     { 
         fprintf(stderr, "%s Directory Scan Error: %s\n", BASEPATH, strerror(errno)); 
@@ -125,13 +123,12 @@ int searchOldFolder()
     
     for(idx = 0; idx < count; idx++)
     {
-        if(num[idx] < min) //num[idx]가 min보다 작다면
-          min = num[idx]; //min 에는 num[idx]의 값이 들어감
-        else
-        {
-          continue;
-        }
-                
+      if(num[idx] < min) //num[idx]가 min보다 작다면
+        min = num[idx]; //min 에는 num[idx]의 값이 들어감
+      else
+      {
+        continue;
+      }              
     }
   
     char deletePath[100];
@@ -169,7 +166,7 @@ int searchOldFolder()
         printf("파일 삭제 성공.\n");
         idx++;
       }
-      
+     
     }
     
     if (access(deletePath, F_OK) == 0)
@@ -257,7 +254,7 @@ int main(int argc, char* argv[])
     while (ratio <= 53.0)
     { 
       printf("용량이 부족합니다.\n");
-      printf("%5f\n", ratio);
+      printf("현재 용량 : %5f%%\n", ratio);
       printf("==================\n\n");
       getTime(LOG_TIME);
       length = sprintf(buff, "%s %s 녹화 시작 가능까지 %5f%%만큼 용량이 부족합니다.\n", tBUF, BASEPATH, 53.0 - ratio);
