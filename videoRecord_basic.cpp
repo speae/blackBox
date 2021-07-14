@@ -147,8 +147,7 @@ int searchOldFolder()
     struct dirent **namelist; 
     int count; 
     int idx; 
-    long long folder_min = 0;
-    long long file_min = 0;
+    long long min = 0;
     long long num[100];
     int missionSuccess;
     
@@ -168,17 +167,17 @@ int searchOldFolder()
     } 
     printf("count = %d\n",count);   
 
-    for(idx=0; idx<count; idx++)
+    for(idx = 0; idx < count; idx++)
     {
         num[idx] = atoll(namelist[idx]->d_name);
     }
 
-    folder_min = num[0];
+    min = num[0];
     
     for(idx = 0; idx < count; idx++)
     {
-        if(num[idx] < folder_min) //num[idx]가 min보다 작다면
-          folder_min = num[idx]; //min 에는 num[idx]의 값이 들어감
+        if(num[idx] < min) //num[idx]가 min보다 작다면
+          min = num[idx]; //min 에는 num[idx]의 값이 들어감
         else
         {
           continue;
@@ -187,7 +186,7 @@ int searchOldFolder()
     }
   
     char deletePath[100];
-    sprintf(deletePath, "%s/%lld", BASEPATH, folder_min);  
+    sprintf(deletePath, "%s/%lld", BASEPATH, min);  
     printf("deletePath = %s\n", deletePath);
     const char* constDeletePath = deletePath;
     printf("constDeletePath = %s\n", constDeletePath);
@@ -210,7 +209,7 @@ int searchOldFolder()
     idx = 0;
     while(idx != count)
     {
-      sprintf(deleteFile, "%s/%lld/%lld.avi", BASEPATH, folder_min, num[idx]);  
+      sprintf(deleteFile, "%s/%lld/%lld.avi", BASEPATH, min, num[idx]);  
       if (unlink(deleteFile) == -1)
       {
         printf("%s 삭제 실패.\n", deleteFile);
@@ -249,6 +248,35 @@ int searchOldFolder()
     free(namelist); 
     
     return missionSuccess; 
+}
+
+void confirmRepeat(MOUNTP* MP)
+{ 
+  int rewinder;
+  if ((rewinder = searchOldFolder()) == 0)
+  {
+    printf("용량 확보 실패.\n");
+    getTime(LOG_TIME);
+    length = sprintf(buff, "%s %s 용량 확보 실패.\n", tBUF, BASEPATH);
+    WRBytes = write(fd, buff, length);
+    exit(1);
+  }
+  else
+  {
+    if (dfget(MP))
+    {
+      printf("용량 확보 중...\n");
+      printf("%5f\n", MP->size.ratio);
+      printf("...\n\n");
+      getTime(LOG_TIME);
+      length = sprintf(buff, "%s %s 용량 확보 중...\n", tBUF, BASEPATH);
+      WRBytes = write(fd, buff, length);
+      if (MP->size.ratio <= 53)
+      {
+        confirmRepeat(MP);
+      }
+    }
+  }  
 }
 
 int main(int argc, char* argv[])
@@ -315,28 +343,12 @@ int main(int argc, char* argv[])
  
       if (dfget(MP))
       {
-        if ((limit_size = MP->size.ratio) <= 53)
+        if (MP->size.ratio <= 53)
         { 
           printf("용량이 부족합니다.\n");
-          printf("%5f\n", limit_size);
+          printf("%5f\n", MP->size.ratio);
           printf("==================\n\n");
-          while (MP->size.ratio <= 53)
-          {
-            int rewinder;
-            if ((rewinder = searchOldFolder()) == 0)
-            {
-              printf("용량 확보 실패.\n");
-              getTime(LOG_TIME);
-              length = sprintf(buff, "%s %s 용량 확보 실패.\n", tBUF, BASEPATH);
-              WRBytes = write(fd, buff, length);
-            }
-            else
-            {
-              printf("용량 확보 중...\n");
-              printf("%5f\n", MP->size.ratio);
-              printf("==================\n\n");
-            }
-          }
+          confirmRepeat(MP);      
         }
         else
         {
@@ -360,7 +372,7 @@ int main(int argc, char* argv[])
       WRBytes = write(fd, buff, length);
 
       getTime(TIME_FILENAME);
-      sprintf(filePath, "%s/%s", BASEPATH, tBUF);
+      sprintf(filePath, "%s/%s/%s", BASEPATH, folderPath, tBUF);
       printf("filePath : %s\n", filePath);
       
       getTime(LOG_TIME);
