@@ -2,14 +2,17 @@
 #include <opencv2/videoio.hpp>
 #include <opencv2/highgui.hpp>
 #include <iostream>
+#include <sys/vfs.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/wait.h>
 #include <pthread.h> 
 #include <dirent.h> 
 #include <stdio.h>
 #include <stdlib.h>
 #include <libgen.h>
-#include <sys/vfs.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h> // O_WRONLY
@@ -21,6 +24,10 @@ using namespace std;
 // "202107121433.avi"
 // #define OUTPUT_VIDEO_NAME "test.avi"
 #define VIDEO_WINDOW_NAME "record"
+
+// 공유 메모리를 이용하여 멀티 프로세스 구현
+#define SHMSIZE 100
+#define KeyValue 0x1234
 
 // mutex 초기화
 static pthread_mutex_t locker;
@@ -34,7 +41,7 @@ int LOG_TIME = 2;
 
 char tBUF[200];
 char buff[200];
-const char* BASEPATH = "/home/pi/blackBox/blackBox/daytime";
+const char* BASEPATH = "/home/pi/blackBox/blackBox/daytime2";
 const char* LOGPATH = "/home/pi/blackBox/blackBox/blackBox.log";
 
 // log 파일 작성 시 필요한 전역 변수들
@@ -135,7 +142,7 @@ int searchOldFolder(){
         fprintf(stderr, "%s Directory Scan Error: %s\n", BASEPATH, strerror(errno)); 
         time_type = LOG_TIME;
         err = pthread_create(&t_id, NULL, getTime, (void*)&time_type);
-        if (err != 0)
+        if (err)
         {
           perror("getTime is not created.");
           exit(1);
@@ -249,7 +256,7 @@ int main(int argc, char* argv[]){
   
   pthread_t t_id;
   int err;
-
+  
   pthread_mutex_init(&locker, NULL);
   
   // 로그파일을 기록하기 위해 파일열기
@@ -429,8 +436,12 @@ int main(int argc, char* argv[]){
     pthread_join(t_id, NULL);
     length = sprintf(buff, "%s %s 명으로 녹화를 시작합니다.\n", tBUF, filePath);
     WRBytes = write(fd, buff, length);
-    pthread_detach(t_id);
-
+    pthread_detach(t_id);    
+    
+    if(access(BASEPATH, F_OK) == -1)
+    {
+      mkdir(BASEPATH, 0755);    
+    }
     if(access(folderPath, F_OK) == -1)
     {
       mkdir(folderPath, 0755);    
@@ -440,7 +451,7 @@ int main(int argc, char* argv[]){
     {
       writer.open(filePath, VideoWriter::fourcc('D', 'I', 'V', 'X'), videoFPS, Size(videoWidth, videoHeight), true);
     }
-    
+  
     if (!writer.isOpened())
     {
       perror("Can't write video");
@@ -506,7 +517,7 @@ int main(int argc, char* argv[]){
         break;
       }   
     }
-
+    
     writer.release();
     if (exitFlag == 1){
       break;
