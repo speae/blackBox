@@ -29,9 +29,8 @@ char tBUF[100];
 char filePath[100];
 char folderPath[100];
 char resultPath[100];
-int savePath[100] = {2021071317, 2021071319};
 char buff[200];
-const char* MMOUNT = "/proc/mounts";
+const char* MMOUNT = "/";
 const char* BASEPATH = "/home/pi/blackBox/blackBox/daytime";
 
 int length;
@@ -58,76 +57,27 @@ void getTime(int ret_type){
   }
 }
 
-struct f_size
+float dfgetRatio()
 {
-    long blocks;
-    long avail; 
-    float ratio;
-};
+    
+  struct statfs lstatfs;
+  float result;
+  int boolean;
+  statfs(MMOUNT, &lstatfs);
+  result = (lstatfs.f_bavail * 100.0) / lstatfs.f_blocks;
+  
+  // boolean = statfs(MMOUNT, &lstatfs);
+  // if (boolean == 0)
+  // {
+  //   result = (lstatfs.f_bavail * 100.0) / lstatfs.f_blocks;
+  // }
+  // else
+  // {
+  //   perror("ERROR! Unable mount to root.\n");
+  //   exit(1);
+  // }
 
-typedef struct _mountinfo 
-{
-    FILE *fp;                // 파일 스트림 포인터    
-    char devname[80];        // 장치 이름
-    char mountdir[80];        // 마운트 디렉토리 이름
-    char fstype[12];        // 파일 시스템 타입
-    struct f_size size;        // 파일 시스템의 총크기/사용율 
-} MOUNTP;
-
-MOUNTP *dfopen()
-{
-    MOUNTP *MP;
-
-    // /proc/mounts 파일을 연다.
-    MP = (MOUNTP *)malloc(sizeof(MOUNTP));
-    if(!(MP->fp = fopen(MMOUNT, "r")))
-    {
-        return NULL;
-    }
-    else
-        return MP;
-}
-
-MOUNTP *dfget(MOUNTP *MP)
-{
-    char buf[256];
-    char *bname;
-    char null[16];
-    struct statfs lstatfs;
-    struct stat lstat; 
-    int is_root = 0;
-
-    // /proc/mounts로 부터 마운트된 파티션의 정보를 얻어온다.
-    while(fgets(buf, 255, MP->fp))
-    {
-        is_root = 0;
-        sscanf(buf, "%s%s%s",MP->devname, MP->mountdir, MP->fstype);
-        
-        // /dev/root
-        if (strcmp(MP->mountdir,"/") == 0) is_root=1;
-        // if (stat(MP->devname, &lstat) == 0 || is_root)
-        if(is_root)
-        {
-            if (strstr(buf, MP->mountdir) && S_ISBLK(lstat.st_mode) || is_root)
-            {
-                // 파일시스템의 총 할당된 크기와 사용량을 구한다.        
-                statfs(MP->mountdir, &lstatfs);
-                MP->size.blocks = lstatfs.f_blocks * (lstatfs.f_bsize/1024); 
-                MP->size.avail  = lstatfs.f_bavail * (lstatfs.f_bsize/1024); 
-                MP->size.ratio = (MP->size.avail * 100.0) / MP->size.blocks;
-                return MP;
-            }
-            break;
-        }
-    }
-    rewind(MP->fp);
-    return NULL;
-}
-
-int dfclose(MOUNTP *MP)
-{
-    fclose(MP->fp);
-    return 0;
+  return result;
 }
 
 static int filter(const struct dirent* dirent){
@@ -211,12 +161,12 @@ int searchOldFolder()
       sprintf(deleteFile, "%s/%lld/%lld.avi", BASEPATH, min, num[idx]);  
       if (unlink(deleteFile) == -1)
       {
-        printf("%s 삭제 실패.\n", deleteFile);
+        printf("파일 삭제 실패.\n");
         break;
       }
       else
       {
-        printf("%s 삭제 성공.\n", deleteFile);
+        printf("파일 삭제 성공.\n");
         idx++;
       }
       
@@ -226,12 +176,12 @@ int searchOldFolder()
     {
       if (rmdir(deletePath) == -1)
       {
-        printf("%s 삭제 실패\n", deletePath);
+        printf("%s 폴더 삭제 실패\n", deletePath);
         missionSuccess = 0; 
       }
       else
       {
-        printf("%s 삭제 성공\n", deletePath);
+        printf("%s 폴더 삭제 성공\n", deletePath);
         missionSuccess = 1;
       }
       
@@ -300,55 +250,47 @@ int main(int argc, char* argv[])
   // 4th : ImageSize
   // 5th : isColor = True
 
-  float limit_size = 0.0f;
-
   while (1)
-  {
-    MOUNTP *MP;
-    if ((MP=dfopen()) == NULL)
-    {
-        perror("error");
-        exit(1);
-    }
-    if ((dfget(MP)) != NULL)
-    {
-      while (MP->size.ratio <= 53)
-      { 
-        printf("용량이 부족합니다.\n");
-        printf("%5f\n", MP->size.ratio);
+  { 
+    float ratio = dfgetRatio();  
+    
+    while (ratio <= 53.0)
+    { 
+      printf("용량이 부족합니다.\n");
+      printf("%5f\n", ratio);
+      printf("==================\n\n");
+      getTime(LOG_TIME);
+      length = sprintf(buff, "%s %s 녹화 시작 가능까지 %5f%%만큼 용량이 부족합니다.\n", tBUF, BASEPATH, 53.0 - ratio);
+      WRBytes = write(fd, buff, length);
+      
+      int rewinder;
+      if ((rewinder = searchOldFolder()) == 1)
+      {
+        ratio = dfgetRatio(); 
+        printf("용량 확보 중...\n");
+        printf("%5f\n", ratio);
+        printf("...\n\n");
+        getTime(LOG_TIME);
+        length = sprintf(buff, "%s %s 용량 확보 중... 현재 %5f%%\n", tBUF, BASEPATH, ratio);
+        WRBytes = write(fd, buff, length);
+      }
+      else
+      {
+        printf("용량 확보 실패.\n");
+        printf("%5f\n", ratio);
         printf("==================\n\n");
         getTime(LOG_TIME);
-        length = sprintf(buff, "%s %s 용량이 부족합니다.\n", tBUF, BASEPATH);
+        length = sprintf(buff, "%s %s 용량 확보 실패... %5f%%\n", tBUF, BASEPATH, ratio);
         WRBytes = write(fd, buff, length);
-        
-        int rewinder;
-        if ((rewinder = searchOldFolder()) == 1)
-        {
-          dfget(MP);
-          printf("용량 확보 중...\n");
-          printf("%5f\n", MP->size.ratio);
-          printf("...\n\n");
-          getTime(LOG_TIME);
-          length = sprintf(buff, "%s %s 용량 확보 중...\n", tBUF, BASEPATH);
-          WRBytes = write(fd, buff, length);
-        }
-        else
-        {
-          printf("용량 확보 실패.\n");
-          printf("%5f\n", MP->size.ratio);
-          printf("==================\n\n");
-          getTime(LOG_TIME);
-          length = sprintf(buff, "%s %s 용량 확보 실패.\n", tBUF, BASEPATH);
-          WRBytes = write(fd, buff, length);
-          break;
-        }
+        break;
       }
-    }  
+    }
+    
     printf("용량이 충분합니다.\n");
-    printf("%5f\n", MP->size.ratio);
+    printf("%5f\n", ratio);
     printf("==================\n\n");
     getTime(LOG_TIME);
-    length = sprintf(buff, "%s %s 용량 확보 성공.\n", tBUF, BASEPATH);
+    length = sprintf(buff, "%s %s 용량 : %5f%% --> 충분합니다.\n", tBUF, BASEPATH, ratio);
     WRBytes = write(fd, buff, length);
   
     // 시간정보를 읽어와서 파일명 생성
@@ -362,7 +304,7 @@ int main(int argc, char* argv[])
     WRBytes = write(fd, buff, length);
 
     getTime(TIME_FILENAME);
-    sprintf(filePath, "%s/%s/%s", BASEPATH, folderPath, tBUF);
+    sprintf(filePath, "%s/%s", folderPath, tBUF);
     printf("filePath : %s\n", filePath);
     
     getTime(LOG_TIME);
@@ -405,7 +347,10 @@ int main(int argc, char* argv[])
         length = sprintf(buff, "%s %s 이미지 읽기 실패.\n", tBUF, filePath);
         WRBytes = write(fd, buff, length);
         break;
-      }  
+      } 
+
+      writer << frame;
+      imshow(VIDEO_WINDOW_NAME, frame);
 
       if (waitKey(10) == 27)
       {

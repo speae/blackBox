@@ -1,9 +1,11 @@
-[2021-07-14 13:16:35]blackbox log파일 저장을 시작합니다.
-[2021-07-14 13:16:35] /home/pi/blackBox/blackBox/daytime 용량이 부족합니다.
-[2021-07-14 13:17:00] /home/pi/blackBox/blackBox/daytime 용량 확보 중...
-[2021-07-14 13:17:10] /home/pi/blackBox/blackBox/daytime 용량이 부족합니다.
-[2021-07-14 13:17:32] /home/pi/blackBox/blackBox/daytime 용량 확보 중...
-[2021-07-14 13:17:40] /home/pi/blackBox/blackBox/daytime 용량이 부족합니다.
-[2021-07-14 13:17:56] /home/pi/blackBox/blackBox/daytime 용량 확보 중...
-[2021-07-14 13:18:16] /home/pi/blackBox/blackBox/daytime 용량이 부족합니다.
-[2021-07-14 13:18:26] /home/pi/blackBox/blackBox/daytime 용량 확보 중...
+[2021-07-14 14:05:19]blackbox log파일 저장을 시작합니다.
+[2021-07-14 14:05:31] /home/pi/blackBox/blackBox/daytime 녹화 시작 가능까지 0.936905%만큼 용량이 부족합니다.
+[2021-07-14 14:05:42] /home/pi/blackBox/blackBox/daytime 용량 확보 중... 현재 52.259434%
+[2021-07-14 14:05:47] /home/pi/blackBox/blackBox/daytime 녹화 시작 가능까지 0.740566%만큼 용량이 부족합니다.
+[2021-07-14 14:05:54] /home/pi/blackBox/blackBox/daytime 용량 확보 중... 현재 52.455795%
+[2021-07-14 14:05:59] /home/pi/blackBox/blackBox/daytime 녹화 시작 가능까지 0.544205%만큼 용량이 부족합니다.
+[2021-07-14 14:06:05] /home/pi/blackBox/blackBox/daytime 용량 확보 중... 현재 52.652161%
+[2021-07-14 14:06:09] /home/pi/blackBox/blackBox/daytime 녹화 시작 가능까지 0.347839%만큼 용량이 부족합니다.
+[2021-07-14 14:06:13] /home/pi/blackBox/blackBox/daytime 용량 확보 중... 현재 52.848522%
+[2021-07-14 14:06:20] /home/pi/blackBox/blackBox/daytime 녹화 시작 가능까지 0.151478%만큼 용량이 부족합니다.
+[2021-07-14 14:06:25] /home/pi/blackBox/blackBox/daytime 용량 확보 중... 현재 53.044884%
