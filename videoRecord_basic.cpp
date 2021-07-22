@@ -40,8 +40,8 @@ int LOG_TIME = 2;
 // 경로 저장 전역 변수 및 절대 경로
 char tBUF[200];
 char buff[200];
-const char* BASEPATH = "/home/pi/blackBox/blackBox/daytime";
-const char* LOGPATH = "/home/pi/blackBox/blackBox/blackBox.log";
+const char* BASEPATH = "/home/pi/blackBox/daytime";
+const char* LOGPATH = "/home/pi/blackBox/blackBox.log";
 
 // log 파일 작성 시 필요한 전역 변수들
 int fd = open(LOGPATH, O_WRONLY | O_CREAT | O_TRUNC, 0644); 
